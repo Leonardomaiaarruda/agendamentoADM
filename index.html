@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ADM - Painel de Controle</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="mobile-adm">
+
+<div class="main-container">
+    <header class="app-header">
+        <h1>Painel ADM</h1>
+     <nav class="admin-nav">
+        <button onclick="mudarTela('gerar')" id="btn-nav-gerar-desk" class="nav-btn active">🛠️ Vagas</button>
+        <button onclick="mudarTela('agenda')" id="btn-nav-agenda-desk" class="nav-btn">📅 Agenda</button>
+        <button onclick="abrirModalConfig()" class="nav-btn">✂️ Serviços</button> </nav>
+     </nav>
+        <div id="status-indicador" class="status-dot"></div>
+    </header>
+
+    <nav class="nav-mobile">
+        <button onclick="mudarTela('gerar')" id="btn-nav-gerar" class="nav-mobile-item active">
+            <i>🛠️</i>
+            <span>Vagas</span>
+        </button>
+        <button onclick="mudarTela('agenda')" id="btn-nav-agenda" class="nav-mobile-item">
+            <i>📅</i>
+            <span>Agenda</span>
+        </button>
+        <button onclick="abrirModalConfig()" class="nav-mobile-item">
+            <i>✂️</i> <span>Serviços</span> </button>
+    </nav>
+
+    <div id="tela-gerar" class="tela-content">
+        <div class="welcome-section" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>🛠️ Gerenciar Vagas</h2>
+            <button id="btnAbrirForm" style="width: auto; padding: 10px 20px;" onclick="toggleFormulario()">➕ Criar Vagas</button>
+        </div>
+
+        <div class="card hidden" id="form-container">
+            <h3>Disponibilizar Horários</h3>
+            <form id="scheduleForm">
+
+                <div class="form-group">
+                    <label>Serviço Padrão (Opcional)</label>
+                    <select id="servico">
+                        <option value="">Selecione um serviço</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Dias da Semana</label>
+                    <div class="dias-semana-grid" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px;">
+                        <label class="check-day-modern"><input type="checkbox" name="dia_sem" value="seg"> S</label>
+                        <label class="check-day-modern"><input type="checkbox" name="dia_sem" value="ter"> T</label>
+                        <label class="check-day-modern"><input type="checkbox" name="dia_sem" value="qua"> Q</label>
+                        <label class="check-day-modern"><input type="checkbox" name="dia_sem" value="qui"> Q</label>
+                        <label class="check-day-modern"><input type="checkbox" name="dia_sem" value="sex"> S</label>
+                        <label class="check-day-modern"><input type="checkbox" name="dia_sem" value="sab"> S</label>
+                    </div>
+                </div>
+
+                <div class="form-group-row">
+                    <div class="form-group"><label>Data Início</label><input type="date" id="dataInicio"></div>
+                    <div class="form-group"><label>Data Fim</label><input type="date" id="dataFim"></div>
+                </div>
+
+                <div class="form-group-row">
+                    <div class="form-group"><label>Hora Início</label><input type="time" id="horaInicio" required></div>
+                    <div class="form-group"><label>Hora Fim</label><input type="time" id="horaFim" required></div>
+                    <div class="form-group"><label>Intervalo (min)</label><input type="number" id="intervalo" value="30"></div>
+                </div>
+
+                <div class="form-group-row">
+                    <div class="form-group"><label>Almoço Início</label><input type="time" id="almocoInicio"></div>
+                    <div class="form-group"><label>Almoço Fim</label><input type="time" id="almocoFim"></div>
+                </div>
+
+                <div class="button-group" style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button type="submit" id="btnSalvar" class="btn-primario">Gerar Horários</button>
+                    <button type="button" onclick="toggleFormulario()" style="background: var(--gray); color: white; border-radius: 12px; padding: 0 20px; border:none;">Voltar</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card table-card">
+            <div class="search-container" style="margin-bottom: 15px;">
+                <input type="text" id="inputBusca" placeholder="🔍 Filtrar vagas..." onkeyup="filtrarTabela()" style="border-radius: 25px;">
+            </div>
+            <div class="table-container">
+                <table id="tabelaHorarios">
+                    <thead>
+                        <tr>
+                            <th>Data/Hora</th>
+                            <th>Status/Serviço</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoTabela"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="tela-agenda" class="tela-content hidden">
+        <div class="welcome-section" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>📅 Agenda</h2>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button onclick="copiarResumo()" class="btn-resumo">📋 Resumo</button>
+                <input type="date" id="filtroDataAgenda" onchange="listarAgendaClientes()" style="width: auto; padding: 5px 10px; border-radius: 8px;">
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <table id="tabelaAgendaConfirmada">
+                <thead>
+                    <tr>
+                        <th>Horário</th>
+                        <th>Cliente</th>
+                        <th>Serviço</th>
+                        <th>Valor</th> 
+                        <th>Contato</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody id="corpoAgenda"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="modalConfig" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✂️ Gerenciar Serviços</h3> <button class="btn-close" onclick="fecharModalConfig()">✕</button>
+            </div>
+            
+            <div class="novo-servico-box" style="display: flex; flex-direction: column; gap: 10px; background: #f9f9f9; padding: 15px; border-radius: 12px; margin-bottom: 15px;">
+                <label style="font-weight: 600; color: var(--dark);">Novo Serviço</label>
+                <input type="text" id="novoServicoNome" placeholder="Ex: Corte Degradê">
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="novoServicoPreco" placeholder="Preço: 35,00" style="flex: 1;">
+                    <button onclick="adicionarServicoLista()" class="btn-add-servico" style="width: 80px;">Add</button>
+                </div>
+                <small style="color: #888;">Dica: Digite o nome e o valor (ex: 35,00).</small>
+            </div>
+
+            <ul id="listaServicosConfig" style="max-height: 300px; overflow-y: auto; margin-bottom: 15px;">
+                </ul>
+
+            <div class="modal-footer">
+                <button onclick="salvarServicosNoGoogle()" class="btn-primario" style="width: 100%;">
+                    ✅ SALVAR ALTERAÇÕES
+                </button>
+                <button onclick="fecharModalConfig()" style="width: 100%; background: none; color: var(--gray); margin-top: 15px; border: 1px solid #ddd; border-radius: 12px; padding: 12px;">
+                    Voltar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="status" style="position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 1000; padding: 10px 20px; border-radius: 20px; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: none;"></div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
