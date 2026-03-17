@@ -329,6 +329,22 @@ button { cursor: pointer; border: none; font-family: inherit; }
     margin-top: 5px;
 }
 
+#login-screen {
+    background: radial-gradient(circle at top right, #2c3e50, #000) !important;
+    z-index: 9999;
+}
+
+#login-screen .card {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
 @media (max-width: 768px) {
     .nav-mobile { display: flex; }
 }
