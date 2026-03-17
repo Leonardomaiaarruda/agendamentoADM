@@ -9,160 +9,241 @@
 </head>
 <body class="mobile-adm">
 
-<div class="main-container">
-    <header class="app-header">
-        <h1>Painel ADM</h1>
-     <nav class="admin-nav">
-        <button onclick="mudarTela('gerar')" id="btn-nav-gerar-desk" class="nav-btn active">🛠️ Vagas</button>
-        <button onclick="mudarTela('agenda')" id="btn-nav-agenda-desk" class="nav-btn">📅 Agenda</button>
-        <button onclick="abrirModalConfig()" class="nav-btn">✂️ Serviços</button> </nav>
-     </nav>
-        <div id="status-indicador" class="status-dot"></div>
-    </header>
-
-    <nav class="nav-mobile">
-        <button onclick="mudarTela('gerar')" id="btn-nav-gerar" class="nav-mobile-item active">
-            <i>🛠️</i>
-            <span>Vagas</span>
-        </button>
-        <button onclick="mudarTela('agenda')" id="btn-nav-agenda" class="nav-mobile-item">
-            <i>📅</i>
-            <span>Agenda</span>
-        </button>
-        <button onclick="abrirModalConfig()" class="nav-mobile-item">
-            <i>✂️</i> <span>Serviços</span> </button>
-    </nav>
-
-    <div id="tela-gerar" class="tela-content">
-        <div class="welcome-section" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2>🛠️ Gerenciar Vagas</h2>
-            <button id="btnAbrirForm" style="width: auto; padding: 10px 20px;" onclick="toggleFormulario()">➕ Criar Vagas</button>
-        </div>
-
-        <div class="card hidden" id="form-container">
-            <h3>Disponibilizar Horários</h3>
-            <form id="scheduleForm">
-
-                <div class="form-group">
-                    <label>Serviço Padrão (Opcional)</label>
-                    <select id="servico">
-                        <option value="">Selecione um serviço</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Dias da Semana</label>
-                    <div class="dias-semana-grid" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px;">
-                        <label class="check-day-modern"><input type="checkbox" name="dia_sem" value="seg"> S</label>
-                        <label class="check-day-modern"><input type="checkbox" name="dia_sem" value="ter"> T</label>
-                        <label class="check-day-modern"><input type="checkbox" name="dia_sem" value="qua"> Q</label>
-                        <label class="check-day-modern"><input type="checkbox" name="dia_sem" value="qui"> Q</label>
-                        <label class="check-day-modern"><input type="checkbox" name="dia_sem" value="sex"> S</label>
-                        <label class="check-day-modern"><input type="checkbox" name="dia_sem" value="sab"> S</label>
-                    </div>
-                </div>
-
-                <div class="form-group-row">
-                    <div class="form-group"><label>Data Início</label><input type="date" id="dataInicio"></div>
-                    <div class="form-group"><label>Data Fim</label><input type="date" id="dataFim"></div>
-                </div>
-
-                <div class="form-group-row">
-                    <div class="form-group"><label>Hora Início</label><input type="time" id="horaInicio" required></div>
-                    <div class="form-group"><label>Hora Fim</label><input type="time" id="horaFim" required></div>
-                    <div class="form-group"><label>Intervalo (min)</label><input type="number" id="intervalo" value="30"></div>
-                </div>
-
-                <div class="form-group-row">
-                    <div class="form-group"><label>Almoço Início</label><input type="time" id="almocoInicio"></div>
-                    <div class="form-group"><label>Almoço Fim</label><input type="time" id="almocoFim"></div>
-                </div>
-
-                <div class="button-group" style="display: flex; gap: 10px; margin-top: 15px;">
-                    <button type="submit" id="btnSalvar" class="btn-primario">Gerar Horários</button>
-                    <button type="button" onclick="toggleFormulario()" style="background: var(--gray); color: white; border-radius: 12px; padding: 0 20px; border:none;">Voltar</button>
-                </div>
-            </form>
-        </div>
-
-        <div class="card table-card">
-            <div class="search-container" style="margin-bottom: 15px;">
-                <input type="text" id="inputBusca" placeholder="🔍 Filtrar vagas..." onkeyup="filtrarTabela()" style="border-radius: 25px;">
+    <div id="login-screen" style="display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1c1e; z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
+        <div class="card" style="width: 100%; max-width: 350px; text-align: center; background: white; padding: 30px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+            <h1 style="margin-bottom: 10px; font-size: 1.5rem; color: #1a1c1e;">🔒 Painel ADM</h1>
+            <p style="color: #8898aa; font-size: 0.9rem; margin-bottom: 25px;">Identifique-se para gerenciar sua agenda.</p>
+            
+            <div class="form-group" style="text-align: left; margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">E-mail</label>
+                <input type="email" id="login-email" placeholder="seu@email.com" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px;">
             </div>
-            <div class="table-container">
-                <table id="tabelaHorarios">
+            
+            <div class="form-group" style="text-align: left; margin-bottom: 25px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Senha</label>
+                <input type="password" id="login-senha" placeholder="••••••••" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px;">
+            </div>
+            
+            <button id="btn-login" onclick="executarLogin()" class="btn-primario" style="width: 100%; padding: 15px; background: #d4a373; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer;">Entrar no Painel</button>
+            <p id="login-erro" style="color: #f5365c; font-size: 0.8rem; margin-top: 15px; display: none;"></p>
+        </div>
+    </div>
+
+    <div class="main-container">
+            <header class="app-header">
+                <div class="user-profile-header">
+                   <div class="avatar-container" style="position: relative; width: 80px; height: 80px; margin: 0 auto;">
+                        <img id="imgPerfil" 
+                            src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" 
+                            style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid #007bff; background: #f0f0f0;">
+                        
+                        <label for="fotoInput" style="position: absolute; bottom: 0; right: 0; background: #007bff; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid white; font-size: 14px;">
+                            📷
+                        </label>
+                        
+                        <input type="file" id="fotoInput" accept="image/*" style="display: none;" onchange="uploadFotoPerfil(event)">
+                    </div>
+                        
+                    <div id="statusUpload" style="font-size: 10px; color: #666; margin-top: 5px; height: 12px; text-align: center;"></div>
+                </div>
+            </header>
+
+            <nav class="admin-nav">
+                <button onclick="mudarTela('gerar')" id="btn-nav-gerar-desk" class="nav-btn active">🛠️ Vagas</button>
+                <button onclick="mudarTela('agenda')" id="btn-nav-agenda-desk" class="nav-btn">📅 Agenda</button>
+                <button onclick="abrirModalConfig()" class="nav-btn">✂️ Serviços</button>
+                <button onclick="abrirModalBarbeiros()" id="btn-nav-equipe" class="nav-btn" style="display: none;">
+                    👥 Equipe
+                </button>
+                <button onclick="fazerLogout()" class="nav-btn" style="color: #f5365c; margin-left: 10px;">🚪 Sair</button>
+            </nav>
+            <div id="status-indicador" class="status-dot"></div>
+        </header>
+
+        <nav class="nav-mobile">
+            <button onclick="mudarTela('gerar')" id="btn-nav-gerar" class="nav-mobile-item active">
+                <i>🛠️</i> <span>Vagas</span>
+            </button>
+            <button onclick="mudarTela('agenda')" id="btn-nav-agenda" class="nav-mobile-item">
+                <i>📅</i> <span>Agenda</span>
+            </button>
+            <button onclick="abrirModalConfig()" class="nav-mobile-item">
+                <i>✂️</i> <span>Serviços</span>
+            </button>
+            <button onclick="abrirModalBarbeiros()" class="nav-btn">👥 Equipe</button>
+
+            <button onclick="fazerLogout()" class="nav-mobile-item" style="color: #f5365c;">
+                <i>🚪</i> <span>Sair</span>
+            </button>
+        </nav>
+     
+        <main id="tela-gerar" class="tela-content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-label">Total de Vagas</span>
+                    <span id="stat-vagas" class="stat-value">--</span>
+                </div>
+                <button class="btn-add-float" id="btnAbrirForm" onclick="toggleFormulario()">➕ Criar Vagas</button>
+            </div>
+
+            <section id="form-container" class="card hidden anim-up">
+                <h2 id="titulo-form">Configurar Nova Grade</h2>
+                <form id="scheduleForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Data Início</label>
+                            <input type="date" id="dataInicio" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Data Fim</label>
+                            <input type="date" id="dataFim" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Dias da Semana</label>
+                        <div class="dias-check-group">
+                            <label class="check-item"><input type="checkbox" name="dia_sem" value="1" checked> Seg</label>
+                            <label class="check-item"><input type="checkbox" name="dia_sem" value="2" checked> Ter</label>
+                            <label class="check-item"><input type="checkbox" name="dia_sem" value="3" checked> Qua</label>
+                            <label class="check-item"><input type="checkbox" name="dia_sem" value="4" checked> Qui</label>
+                            <label class="check-item"><input type="checkbox" name="dia_sem" value="5" checked> Sex</label>
+                            <label class="check-item"><input type="checkbox" name="dia_sem" value="6" checked> Sáb</label>
+                            <label class="check-item"><input type="checkbox" name="dia_sem" value="0"> Dom</label>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Hora Início</label>
+                            <input type="time" id="horaInicio" value="08:00" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Hora Fim</label>
+                            <input type="time" id="horaFim" value="19:00" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Intervalo (min)</label>
+                            <select id="intervalo">
+                                <option value="30">30 min</option>
+                                <option value="45">45 min</option>
+                                <option value="60" selected>60 min</option>
+                                <option value="90">90 min</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Serviço Fixo (opcional)</label>
+                            <select id="servico"></select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Início Almoço (opcional)</label>
+                            <input type="time" id="almocoInicio">
+                        </div>
+                        <div class="form-group">
+                            <label>Fim Almoço (opcional)</label>
+                            <input type="time" id="almocoFim">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btnSalvar" class="btn-primario">Gerar Horários</button>
+                </form>
+            </section>
+
+            <div class="card table-container">
+                <table>
                     <thead>
                         <tr>
                             <th>Data/Hora</th>
                             <th>Status/Serviço</th>
-                            <th>Ação</th>
+                            <th style="text-align: right;">Ações</th>
                         </tr>
                     </thead>
                     <tbody id="corpoTabela"></tbody>
                 </table>
             </div>
-        </div>
-    </div>
+        </main>
 
-    <div id="tela-agenda" class="tela-content hidden">
-        <div class="welcome-section" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2>📅 Agenda</h2>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <button onclick="copiarResumo()" class="btn-resumo">📋 Resumo</button>
-                <input type="date" id="filtroDataAgenda" onchange="listarAgendaClientes()" style="width: auto; padding: 5px 10px; border-radius: 8px;">
+        <main id="tela-agenda" class="tela-content hidden">
+            <div class="card table-container">
+                <h2 style="padding: 20px;">📅 Próximos Agendamentos</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Horário</th>
+                            <th>Cliente</th>
+                            <th>Serviço</th>
+                            <th>Valor</th>
+                            <th>Contato</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoAgenda"></tbody>
+                </table>
             </div>
-        </div>
-        
-        <div class="table-container">
-            <table id="tabelaAgendaConfirmada">
-                <thead>
-                    <tr>
-                        <th>Horário</th>
-                        <th>Cliente</th>
-                        <th>Serviço</th>
-                        <th>Valor</th> 
-                        <th>Contato</th>
-                        <th>Ação</th>
-                    </tr>
-                </thead>
-                <tbody id="corpoAgenda"></tbody>
-            </table>
-        </div>
+        </main>
     </div>
 
     <div id="modalConfig" class="modal hidden">
-        <div class="modal-content">
+        <div class="modal-content anim-up">
             <div class="modal-header">
-                <h3>✂️ Gerenciar Serviços</h3> <button class="btn-close" onclick="fecharModalConfig()">✕</button>
+                <h2>✂️ Meus Serviços</h2>
+                <button onclick="fecharModalConfig()" class="btn-close">×</button>
             </div>
             
-            <div class="novo-servico-box" style="display: flex; flex-direction: column; gap: 10px; background: #f9f9f9; padding: 15px; border-radius: 12px; margin-bottom: 15px;">
-                <label style="font-weight: 600; color: var(--dark);">Novo Serviço</label>
+            <div class="form-group" style="padding: 15px; background: #f8f9fa; border-radius: 12px; margin-bottom: 20px;">
+                <label>Novo Serviço</label>
                 <input type="text" id="novoServicoNome" placeholder="Ex: Corte Degradê">
-                <div style="display: flex; gap: 10px;">
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
                     <input type="text" id="novoServicoPreco" placeholder="Preço: 35,00" style="flex: 1;">
                     <button onclick="adicionarServicoLista()" class="btn-add-servico" style="width: 80px;">Add</button>
                 </div>
-                <small style="color: #888;">Dica: Digite o nome e o valor (ex: 35,00).</small>
             </div>
 
-            <ul id="listaServicosConfig" style="max-height: 300px; overflow-y: auto; margin-bottom: 15px;">
-                </ul>
+            <ul id="listaServicosConfig" style="max-height: 300px; overflow-y: auto; margin-bottom: 15px; list-style: none; padding: 0;">
+            </ul>
 
             <div class="modal-footer">
                 <button onclick="salvarServicosNoGoogle()" class="btn-primario" style="width: 100%;">
                     ✅ SALVAR ALTERAÇÕES
                 </button>
-                <button onclick="fecharModalConfig()" style="width: 100%; background: none; color: var(--gray); margin-top: 15px; border: 1px solid #ddd; border-radius: 12px; padding: 12px;">
-                    Voltar
-                </button>
             </div>
         </div>
     </div>
 
-    <div id="status" style="position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 1000; padding: 10px 20px; border-radius: 20px; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: none;"></div>
-</div>
+    <div id="status" style="position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 1000; background: var(--dark); color: white; padding: 12px 24px; border-radius: 30px; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.2);"></div>
 
-<script src="script.js"></script>
+    <div id="modalBarbeiros" class="modal hidden">
+        <div class="modal-content anim-up">
+            <div class="modal-header">
+                <h2>👥 Minha Equipe</h2>
+                <button onclick="fecharModalBarbeiros()" class="btn-close">×</button>
+            </div>
+            
+            <div class="form-group" style="padding: 15px; background: #f0f7ff; border-radius: 12px; margin-bottom: 20px;">
+                <label>Novo Barbeiro (Nome Completo)</label>
+                <input type="text" id="novoBarbeiroNome" placeholder="Ex: João da Silva">
+                <label style="margin-top:10px; display:block;">E-mail de Acesso</label>
+                <input type="email" id="novoBarbeiroEmail" placeholder="barbeiro@email.com">
+                <button onclick="adicionarBarbeiro()" class="btn-primario" style="margin-top: 15px; width: 100%;">
+                    Registrar Barbeiro
+                </button>
+                <small style="color: #666; display: block; margin-top: 10px;">
+                    * O barbeiro usará este e-mail para logar no painel.
+                </small>
+            </div>
+
+            <ul id="listaBarbeirosConfig" style="max-height: 250px; overflow-y: auto; list-style: none; padding: 0;">
+                </ul>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="script.js"></script>
 </body>
 </html>
