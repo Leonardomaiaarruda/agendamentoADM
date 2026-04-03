@@ -16,18 +16,27 @@
             
             <div class="form-group" style="text-align: left; margin-bottom: 15px;">
                 <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">E-mail</label>
-                <input type="email" id="login-email" placeholder="seu@email.com" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px;">
+                <input type="email" id="email" placeholder="seu@email.com" class="input-field" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px;">
             </div>
             
             <div class="form-group" style="text-align: left; margin-bottom: 25px;">
                 <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem;">Senha</label>
                 <input type="password" id="login-senha" placeholder="••••••••" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px;">
             </div>
+
             
             <button id="btn-login" onclick="executarLogin()" class="btn-primario" style="width: 100%; padding: 15px; background: #d4a373; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer;">Entrar no Painel</button>
             <p id="login-erro" style="color: #f5365c; font-size: 0.8rem; margin-top: 15px; display: none;"></p>
+       
+
+    <p style="margin-top: 15px; font-size: 0.85rem;">
+        <a href="javascript:void(0)" onclick="solicitarRecuperacaoSenha()" style="color: #d4a373; text-decoration: none; font-weight: 600;">
+            Esqueci minha senha
+        </a>
+    </p>
         </div>
     </div>
+
 
     <div class="main-container">
         <header class="app-header">
@@ -43,6 +52,10 @@
                     
                     <input type="file" id="fotoInput" accept="image/*" style="display: none;" onchange="uploadFotoPerfil(event)">
                 </div>
+                <button onclick="abrirModalSenha()" class="btn-outline" style="padding: 5px 10px; font-size: 12px;">
+                    🔑 Mudar Senha
+                </button>
+                
                 <div id="statusUpload" style="font-size: 10px; color: #666; margin-top: 5px; height: 12px; text-align: center;"></div>
             </div>
 
@@ -225,6 +238,26 @@
 
             <h3 style="font-size: 1rem; margin-bottom: 10px;">Barbeiros Ativos</h3>
             <ul id="listaBarbeirosConfig" style="max-height: 250px; overflow-y: auto; list-style: none; padding: 0;"></ul>
+        </div>
+    </div>
+
+    <div id="modalSenha" class="modal-overlay hidden">
+        <div class="modal-content-centered">
+            <button onclick="fecharModalSenha()" class="btn-close-modal">&times;</button>
+            
+            <h3 style="margin-bottom: 20px; text-align: center;">🔐 Alterar Senha</h3>
+            
+            <label style="font-size: 0.85rem; font-weight: 600;">Nova Senha</label>
+            <input type="password" id="novaSenhaInput" class="input-field" placeholder="Mínimo 6 caracteres" style="width: 100%; margin-bottom: 15px;">
+            
+            <label style="font-size: 0.85rem; font-weight: 600;">Confirmar Nova Senha</label>
+            <input type="password" id="confirmarSenhaInput" class="input-field" placeholder="Repita a senha" style="width: 100%; margin-bottom: 20px;">
+            
+            <button onclick="executarTrocaSenha()" id="btnConfirmarSenha" class="btn-primario" style="width: 100%;">
+                Atualizar Senha
+            </button>
+            
+            <p id="statusSenha" style="font-size: 12px; text-align: center; margin-top: 15px; display: none;"></p>
         </div>
     </div>
 
