@@ -115,36 +115,72 @@ async function verificarAcesso() {
 
 /** Executa o login com os dados inseridos na interface **/
 async function executarLogin() {
-    const email = document.getElementById('login-email').value;
-    const senha = document.getElementById('login-senha').value;
-    const btn = document.getElementById('btn-login');
-    const erroTxt = document.getElementById('login-erro');
+    const emailInput = document.getElementById('email');
+    const senhaInput = document.getElementById('login-senha');
+    const btnLogin = document.querySelector('#login-screen .btn-primario');
 
-    if (!email || !senha) return alert("Preencha e-mail e senha.");
-
-    btn.innerText = "⌛ Validando...";
-    btn.disabled = true;
-    if (erroTxt) erroTxt.style.display = 'none';
-
-    // Tentativa de login no Supabase Auth
-    const { data, error } = await _supabase.auth.signInWithPassword({ email, password: senha });
-
-    if (error) {
-        if (erroTxt) {
-            erroTxt.innerText = "Acesso negado: " + error.message;
-            erroTxt.style.display = 'block';
-        }
-        btn.innerText = "Entrar no Painel";
-        btn.disabled = false;
-    } else {
-        // Login sucesso: o Supabase salva o token no localStorage e recarregamos para aplicar o RLS
-        location.reload(); 
+    if (!emailInput || !senhaInput) {
+        console.error("IDs não encontrados: Verifique se os campos existem no HTML.");
+        return;
     }
 
-    // Dentro do sucesso do seu login:
-    localStorage.setItem('barbeiro_id', data.id); // Salva o ID do funcionário
-    barbeiroLogadoId = data.id;
-    carregarFotoPerfil(); // Chama a função para buscar a foto que foi salva anteriormente
+    const email = emailInput.value.trim();
+    const senha = senhaInput.value.trim();
+
+    if (!email || !senha) {
+        alert("⚠️ Por favor, preencha e-mail e senha.");
+        return;
+    }
+
+    if (btnLogin) {
+        btnLogin.disabled = true;
+        btnLogin.innerText = "⏳ Autenticando...";
+    }
+
+    try {
+        // 1. Valida e-mail e senha no Supabase Auth
+        const { data, error } = await _supabase.auth.signInWithPassword({
+            email: email,
+            password: senha
+        });
+
+        if (error) throw error;
+
+        // 2. BUSCA O STATUS DO BARBEIRO NO BANCO (A "BLINDAGEM")
+        // Verificamos se ele está ativo antes de permitir o acesso ao painel
+        const { data: perfil, error: perfilError } = await _supabase
+            .from('barbeiros')
+            .select('ativo')
+            .eq('id', data.user.id)
+            .single();
+
+        if (perfilError) throw new Error("Erro ao verificar perfil: " + perfilError.message);
+
+        // 3. VERIFICAÇÃO DE BLOQUEIO
+        if (perfil && perfil.ativo === false) {
+            // Se estiver desativado, fazemos o logout imediato da sessão que acabou de abrir
+            await _supabase.auth.signOut();
+            throw new Error("Sua conta está desativada. Entre em contato com o administrador.");
+        }
+
+        // 4. Sucesso: Se passou por tudo, recarrega para entrar
+        window.location.reload();
+
+    } catch (err) {
+        console.error("Erro no login:", err.message);
+        
+        // Mensagem personalizada caso seja bloqueio ou erro de senha
+        const msgErro = err.message.includes("desativada") 
+            ? err.message 
+            : "❌ Usuário ou senha incorretos.";
+            
+        alert(msgErro);
+        
+        if (btnLogin) {
+            btnLogin.disabled = false;
+            btnLogin.innerText = "Entrar no Painel";
+        }
+    }
 }
 
 /**
@@ -480,13 +516,13 @@ if (form) {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        // 1. Bloqueio de segurança: verifica se o barbeiro está identificado
+        // 1. Bloqueio de segurança
         if (!barbeiroLogadoId) {
             alert("Erro: Seu usuário não está identificado. Faça login novamente.");
             return;
         }
 
-        // 2. Captura de Elementos com Verificação (Evita o erro de 'null')
+        // 2. Captura de Elementos
         const elDataInicio = document.getElementById('dataInicio');
         const elDataFim = document.getElementById('dataFim');
         const elHoraInicio = document.getElementById('horaInicio');
@@ -496,9 +532,8 @@ if (form) {
         const elAlmocoInicio = document.getElementById('almocoInicio');
         const elAlmocoFim = document.getElementById('almocoFim');
 
-        // Validação básica: se os campos principais não existem, interrompe para não dar erro
         if (!elDataInicio || !elHoraInicio || !elIntervalo) {
-            console.error("Erro: Campos essenciais do formulário não encontrados no HTML.");
+            console.error("Erro: Campos essenciais não encontrados.");
             return;
         }
 
@@ -527,9 +562,27 @@ if (form) {
                     return;
                 }
 
+                // --- INÍCIO DA VALIDAÇÃO DE DUPLICIDADE ---
+                // Busca todos os horários já existentes para este barbeiro no período selecionado
+                const { data: horariosExistentes, error: erroConsulta } = await _supabase
+                    .from('agendamentos')
+                    .select('data, horario')
+                    .eq('barbeiro_id', barbeiroLogadoId)
+                    .gte('data', dataInicioInput)
+                    .lte('data', dataFimInput);
+
+                if (erroConsulta) throw erroConsulta;
+
+                // Criamos um mapa (Set) para busca rápida de "Data Hora"
+                const mapaExistentes = new Set(
+                    horariosExistentes.map(h => `${h.data} ${h.horario}`)
+                );
+                // --- FIM DA VALIDAÇÃO ---
+
                 let dataAtual = new Date(dataInicioInput + 'T12:00:00');
                 const dataFinal = new Date(dataFimInput + 'T12:00:00');
                 let novasVagas = [];
+                let contagemDuplicados = 0;
 
                 while (dataAtual <= dataFinal) {
                     if (diasSelecionados.includes(dataAtual.getDay())) {
@@ -547,19 +600,26 @@ if (form) {
                         }
 
                         while (tempoMinutos < tempoFimMinutos) {
-                            // Só adiciona se não estiver no horário de almoço
                             if (!(tempoMinutos >= minAlmocoIni && tempoMinutos < minAlmocoFim)) {
                                 let hh = Math.floor(tempoMinutos / 60).toString().padStart(2, '0');
                                 let mm = (tempoMinutos % 60).toString().padStart(2, '0');
+                                
+                                const dataString = dataAtual.toISOString().split('T')[0];
+                                const horaString = `${hh}:${mm}:00`;
 
-                                novasVagas.push({
-                                    barbearia_id: BARBEARIA_ID,
-                                    barbeiro_id: barbeiroLogadoId,
-                                    data: dataAtual.toISOString().split('T')[0],
-                                    horario: `${hh}:${mm}:00`,
-                                    status: 'disponivel',
-                                    servico: servicoSelecionado
-                                });
+                                // Verifica se já existe no mapa antes de adicionar à lista de insert
+                                if (mapaExistentes.has(`${dataString} ${horaString}`)) {
+                                    contagemDuplicados++;
+                                } else {
+                                    novasVagas.push({
+                                        barbearia_id: BARBEARIA_ID,
+                                        barbeiro_id: barbeiroLogadoId,
+                                        data: dataString,
+                                        horario: horaString,
+                                        status: 'disponivel',
+                                        servico: servicoSelecionado
+                                    });
+                                }
                             }
                             tempoMinutos += intervalo;
                         }
@@ -570,9 +630,15 @@ if (form) {
                 if (novasVagas.length > 0) {
                     const { error } = await _supabase.from('agendamentos').insert(novasVagas);
                     if (error) {
-                        if (error.code === '23503') throw new Error("Usuário não vinculado à tabela barbeiros. Verifique a aba Equipe.");
+                        if (error.code === '23503') throw new Error("Usuário não vinculado à tabela barbeiros.");
                         throw error;
                     }
+                    
+                    let msg = `✅ ${novasVagas.length} horários gerados!`;
+                    if (contagemDuplicados > 0) msg += `\n⚠️ ${contagemDuplicados} duplicados ignorados.`;
+                    alert(msg);
+                } else {
+                    alert("⚠️ Nenhum horário novo foi gerado (todos já existem ou estão fora dos dias).");
                 }
 
             } else {
@@ -586,9 +652,9 @@ if (form) {
                     .eq('id', idSendoEditado);
                 
                 if (error) throw error;
+                alert("✅ Horário atualizado!");
             }
 
-            if (typeof exibirStatus === "function") exibirStatus("✅ Horários Gerados!");
             fecharELimparFormulario();
             await listarHorarios();
 
@@ -892,47 +958,60 @@ async function listarBarbeirosConfig() {
     listaUl.innerHTML = '<li style="text-align:center; padding:20px; color:#666;">⌛ Carregando equipe...</li>';
 
     try {
-        // Busca todos os barbeiros da sua barbearia
+        // Busca todos os barbeiros (incluindo a coluna 'ativo')
         const { data: barbeiros, error } = await _supabase
             .from('barbeiros')
             .select('*')
             .eq('barbearia_id', BARBEARIA_ID)
+            .order('ativo', { ascending: false }) // Mostra os ativos primeiro
             .order('nome', { ascending: true });
 
         if (error) throw error;
 
-        // Se não houver ninguém além de você (ou se a tabela estiver vazia)
         if (!barbeiros || barbeiros.length === 0) {
             listaUl.innerHTML = '<li style="text-align:center; padding:20px; color:#666;">Nenhum barbeiro cadastrado.</li>';
             return;
         }
 
-        // Limpa e preenche a lista
         listaUl.innerHTML = '';
         
         barbeiros.forEach(barbeiro => {
             const li = document.createElement('li');
+            const estaAtivo = barbeiro.ativo === true;
+
+            // Estilização base do item
             li.style.display = 'flex';
             li.style.alignItems = 'center';
             li.style.gap = '12px';
             li.style.padding = '12px';
             li.style.borderBottom = '1px solid rgba(0,0,0,0.05)';
-            li.style.background = 'white';
+            li.style.background = estaAtivo ? 'white' : '#f8f9fa'; // Fundo cinza se inativo
             li.style.borderRadius = '8px';
             li.style.marginBottom = '8px';
+            li.style.transition = 'opacity 0.3s ease';
+            
+            // Se estiver inativo, deixamos o item meio transparente
+            if (!estaAtivo) {
+                li.style.opacity = '0.6';
+            }
 
-            // Fallback para imagem caso não tenha foto_url
             const fotoUrl = barbeiro.foto_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
 
             li.innerHTML = `
-                <img src="${fotoUrl}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid #eee;">
+                <img src="${fotoUrl}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid #eee; filter: ${estaAtivo ? 'none' : 'grayscale(100%)'};">
                 <div style="flex: 1;">
-                    <strong style="display: block; font-size: 0.9rem; color: #333;">${barbeiro.nome}</strong>
+                    <strong style="display: block; font-size: 0.9rem; color: ${estaAtivo ? '#333' : '#888'};">
+                        ${barbeiro.nome} ${estaAtivo ? '' : '<span style="font-size: 0.6rem; background: #ddd; padding: 2px 5px; border-radius: 4px; margin-left: 5px;">DESATIVADO</span>'}
+                    </strong>
                     <span style="font-size: 0.75rem; color: #888;">${barbeiro.email}</span>
                 </div>
-                <button onclick="removerBarbeiroDaEquipe('${barbeiro.id}', '${barbeiro.nome}')" 
-                        style="background: none; border: none; color: #f5365c; cursor: pointer; font-size: 1.1rem; padding: 5px;" title="Remover Barbeiro">
-                    🗑️
+                
+                <button onclick="alternarStatusBarbeiro('${barbeiro.id}', ${estaAtivo})" 
+                        style="background: none; border: none; cursor: pointer; font-size: 1.2rem; padding: 5px; transition: transform 0.2s;" 
+                        title="${estaAtivo ? 'Desativar Acesso' : 'Reativar Acesso'}"
+                        onmouseover="this.style.transform='scale(1.2)'" 
+                        onmouseout="this.style.transform='scale(1)'">
+                    ${estaAtivo ? '🚫' : '✅'}
                 </button>
             `;
             listaUl.appendChild(li);
@@ -963,29 +1042,159 @@ async function removerBarbeiroDaEquipe(id, nome) {
     }
 }
 
+function abrirModalSenha() {
+    document.getElementById('modalSenha').classList.remove('hidden');
+    document.getElementById('novaSenhaInput').focus(); // Dá foco automático ao abrir
+}
 
-// IMPORTANTE: Chame esta função logo após o barbeiro logar
+function fecharModalSenha() {
+    document.getElementById('modalSenha').classList.add('hidden');
+    // Limpa os campos ao fechar
+    document.getElementById('novaSenhaInput').value = "";
+    document.getElementById('confirmarSenhaInput').value = "";
+}
+
+async function executarTrocaSenha() {
+    const novaSenha = document.getElementById('novaSenhaInput').value.trim();
+    const confirma = document.getElementById('confirmarSenhaInput').value.trim();
+    const btn = document.getElementById('btnConfirmarSenha');
+    const status = document.getElementById('statusSenha');
+
+    if (novaSenha.length < 6) return alert("A senha deve ter 6+ caracteres.");
+    if (novaSenha !== confirma) return alert("As senhas não coincidem.");
+
+    btn.disabled = true;
+    btn.innerText = "⏳ Processando...";
+
+    try {
+        const { error } = await _supabase.auth.updateUser({ password: novaSenha });
+        if (error) throw error;
+
+        // FEEDBACK DE SUCESSO
+        status.style.display = "block";
+        status.innerText = "✅ Senha alterada com sucesso!";
+        status.style.color = "green";
+
+        // FECHAMENTO AUTOMÁTICO APÓS 1.5 SEGUNDOS
+        setTimeout(() => {
+            fecharModalSenha();
+            btn.disabled = false;
+            btn.innerText = "Atualizar Senha";
+            status.style.display = "none";
+        }, 1500);
+
+    } catch (err) {
+        alert("Erro: " + err.message);
+        btn.disabled = false;
+        btn.innerText = "Atualizar Senha";
+    }
+}
+
+
+async function solicitarRecuperacaoSenha() {
+    const emailInput = document.getElementById('email'); 
+    
+    if (!emailInput) {
+        alert("Erro técnico: Campo de e-mail não encontrado.");
+        return;
+    }
+
+    const email = emailInput.value.trim();
+
+    if (!email) {
+        alert("⚠️ Por favor, digite seu e-mail no campo de login para receber o link de recuperação.");
+        emailInput.focus();
+        return;
+    }
+
+    // 3. Feedback visual no link/botão
+    const btnLink = event.target;
+    const textoOriginal = btnLink.innerText;
+    
+    try {
+        btnLink.innerText = "⏳ Enviando...";
+        btnLink.style.pointerEvents = "none";
+
+        const { error } = await _supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin + window.location.pathname,
+        });
+
+        if (error) throw error;
+
+        alert("✅ Link enviado! Verifique sua caixa de entrada (e o Spam).");
+
+    } catch (err) {
+        alert("❌ Erro: " + err.message);
+    } finally {
+        btnLink.innerText = textoOriginal;
+        btnLink.style.pointerEvents = "auto";
+    }
+}
+
+async function alternarStatusBarbeiro(id, statusAtual) {
+    const novoStatus = !statusAtual; 
+    const acao = novoStatus ? "reativar" : "desativar";
+
+    if (!confirm(`Tem certeza que deseja ${acao} este funcionário?`)) return;
+
+    try {
+        console.log("Iniciando Update - ID:", id, "Novo Status:", novoStatus);
+
+        const { data, error } = await _supabase
+            .from('barbeiros')
+            .update({ ativo: novoStatus })
+            .eq('id', id) // Verifique se no banco a coluna chama 'id' ou 'usuario_id'
+            .select();
+
+        if (error) {
+            console.error("Erro retornado pelo Supabase:", error);
+            throw new Error(error.message);
+        }
+
+        if (!data || data.length === 0) {
+            // Se cair aqui após você criar a Policy, o problema é o ID que não existe na tabela
+            console.error("Dados retornados vazios. O ID existe na tabela barbeiros?");
+            throw new Error("ID não encontrado ou bloqueado pela RLS.");
+        }
+
+        alert(`✅ Sucesso! Funcionário ${novoStatus ? 'Ativo' : 'Desativado'}.`);
+        
+        // Recarrega a lista para atualizar a interface
+        if (typeof listarBarbeirosConfig === "function") {
+            await listarBarbeirosConfig();
+        }
+
+    } catch (err) {
+        console.error("Erro detalhado:", err);
+        alert("❌ Falha na operação: " + err.message);
+    }
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
     const telaLogin = document.getElementById('login-screen');
     
-    // 1. Obtém a sessão atual do Supabase (substitui o idSalvo do localStorage por algo mais seguro)
-    const { data: { session }, error } = await _supabase.auth.getSession();
+    // 1. Obtém a sessão atual
+    const { data: { session } } = await _supabase.auth.getSession();
 
-    if (session) {
-        // Define o ID global do barbeiro logado
-        barbeiroLogadoId = session.user.id;
+    // 2. Verifica se o usuário veio por um link de recuperação (Esqueci Senha)
+    // O Supabase pode enviar os dados via Hash (#) ou Query (?)
+    const urlParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+    const isRecovery = urlParams.get('type') === 'recovery' || window.location.hash.includes('access_token');
+
+    if (session || isRecovery) {
+        // Se houver sessão, define o ID do barbeiro
+        if (session) {
+            barbeiroLogadoId = session.user.id;
+        }
         
-        // Esconde a tela de login se houver sessão ativa
+        // Esconde a tela de login
         if (telaLogin) telaLogin.style.display = 'none';
 
-        // 2. Verifica se é Admin para mostrar os botões de Equipe
+        // Inicializações padrão
         await verificarPermissoes();
-
-        // 3. Inicializa os componentes da interface
         if (typeof carregarFotoPerfil === "function") carregarFotoPerfil();
         if (typeof configurarCalendario === "function") configurarCalendario();
         
-        // Carrega serviços e horários (IDs conforme seu script.js)
         if (typeof carregarServicosBD === "function") {
             await carregarServicosBD();
         } else if (typeof carregarServicos === "function") {
@@ -994,13 +1203,52 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         if (typeof listarHorarios === "function") listarHorarios();
 
+        // 3. Gatilho específico para Redefinição de Senha
+        if (isRecovery) {
+            setTimeout(() => {
+                // Abre o modal centralizado que criamos
+                if (typeof abrirModalSenha === "function") {
+                    abrirModalSenha();
+                    // Opcional: um aviso mais amigável que o alert
+                    console.log("Modo de recuperação de senha ativado.");
+                }
+            }, 1200); // Um pouco mais de tempo para garantir que o Supabase validou o token
+        }
+
     } else {
-        // Se não houver sessão, garante que a tela de login apareça
+        // Se não houver sessão nem recuperação, mostra o login
         if (telaLogin) telaLogin.style.display = 'flex';
     }
+
+
+
+    // ESCUTADOR EM TEMPO REAL PARA DESLOGAR QUEM FOR DESATIVADO
+const canalBarbeiros = _supabase
+  .channel('mudancas-status')
+  .on(
+    'postgres_changes',
+    {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'barbeiros'
+    },
+    (payload) => {
+      // 1. Verifica se a mudança foi na coluna 'ativo' e se agora é 'false'
+      // 2. Verifica se o barbeiro alterado é exatamente o que está logado agora
+      if (payload.new.id === barbeiroLogadoId && payload.new.ativo === false) {
+          
+          alert("🚨 Sua conta foi desativada pelo administrador. Você será deslogado agora.");
+          
+          // Executa o logout
+          _supabase.auth.signOut().then(() => {
+              window.location.reload(); // Recarrega para voltar à tela de login
+          });
+      }
+    }
+  )
+  .subscribe();
 });
 
-// Certifique-se de que sua função de permissões use o email ou metadados
 async function verificarPermissoes() {
     const { data: { user } } = await _supabase.auth.getUser();
     if (!user) return;
@@ -1022,3 +1270,5 @@ async function verificarPermissoes() {
         console.log("Nível de acesso: Barbeiro");
     }
 }
+
+
