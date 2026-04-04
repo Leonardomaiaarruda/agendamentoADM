@@ -361,7 +361,7 @@ async function listarAgendaClientes() {
         if (error) throw error;
 
         if (!agendamentos || agendamentos.length === 0) {
-            corpoAgenda.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">Você não tem clientes agendados.</td></tr>';
+            corpoAgenda.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">Nenhum cliente agendado.</td></tr>';
             return;
         }
 
@@ -370,70 +370,71 @@ async function listarAgendaClientes() {
         agendamentos.forEach(item => {
             const tr = document.createElement('tr');
             const dataBr = item.data.split('-').reverse().join('/');
-            
             const celularBruto = item['cliente-whatsapp'] || "";
             const numeroLimpo = celularBruto.replace(/\D/g, '');
+            let linkWhatsapp = numeroLimpo.length >= 10 ? `https://wa.me/${numeroLimpo.startsWith('55') ? '' : '55'}${numeroLimpo}` : "";
 
-            let linkWhatsapp = "";
-            if (numeroLimpo.length >= 10) {
-                const prefixo = numeroLimpo.startsWith('55') ? '' : '55';
-                linkWhatsapp = `https://wa.me/${prefixo}${numeroLimpo}`;
-            }
-
-            // --- LÓGICA DE FOTOS CORRIGIDA ---
+            // Lógica de Galeria de Fotos
             let htmlFotos = '';
-            // Verificamos se existe o array e se ele tem conteúdo real
-            const listaFotos = item.foto_corte; 
-
-            if (Array.isArray(listaFotos) && listaFotos.length > 0) {
-                // Filtramos possíveis valores nulos ou vazios que sobraram de testes antigos
-                const fotosValidas = listaFotos.filter(url => url && url !== "null" && url !== "");
-                
+            if (Array.isArray(item.foto_corte) && item.foto_corte.length > 0) {
+                const fotosValidas = item.foto_corte.filter(url => url && url !== "null");
                 if (fotosValidas.length > 0) {
-                    htmlFotos = '<div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">';
-                    htmlFotos += fotosValidas.map(url => `
-                        <div style="position: relative;">
-                            <img src="${url}" onclick="window.open('${url}', '_blank')" 
-                                 style="width: 55px; height: 55px; border-radius: 8px; object-fit: cover; border: 2px solid #d4a373; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                        </div>
-                    `).join('');
-                    htmlFotos += '</div>';
+                    htmlFotos = `
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
+                            ${fotosValidas.map(url => `
+                                <img src="${url}" onclick="window.open('${url}', '_blank')" 
+                                     style="width: 60px; height: 60px; border-radius: 10px; object-fit: cover; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                            `).join('')}
+                        </div>`;
                 }
             }
 
+            // Design em modo "Card" para cada linha da tabela
             tr.innerHTML = `
-                <td style="padding: 12px; vertical-align: middle;">
-                    <div style="font-weight: bold; color: #333;">${item.horario.substring(0, 5)}</div>
-                    <div style="font-size: 11px; color: #777;">${dataBr}</div>
-                </td>
-                <td style="padding: 12px; vertical-align: middle;">
-                    <div style="font-weight: 700; color: #1a1c1e; font-size: 14px;">${item.cliente_nome || 'Cliente'}</div>
-                    <div style="font-size: 12px; color: #d4a373; font-weight: 600; margin-top: 2px;">${item.servico || 'Serviço não definido'}</div>
-                    ${htmlFotos}
-                </td>
-                <td style="padding: 12px; text-align: center; vertical-align: middle;">
-                    ${linkWhatsapp ? 
-                        `<a href="${linkWhatsapp}" target="_blank" style="text-decoration: none;">
-                            <div style="background: #25D366; color: white; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin: 0 auto; font-size: 18px; box-shadow: 0 2px 5px rgba(0,0,0,0.15);">
-                                📞
+                <td colspan="5" style="padding: 15px; border-bottom: 8px solid #f8f9fa;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                <span style="background: #1a1c1e; color: white; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 14px;">
+                                    ${item.horario.substring(0, 5)}
+                                </span>
+                                <span style="font-size: 12px; color: #777; font-weight: 600;">${dataBr}</span>
                             </div>
-                        </a>` : 
-                        '<span style="color: #ccc; font-size: 10px;">-</span>'
-                    }
-                </td>
-                <td style="padding: 12px; text-align: right; vertical-align: middle;">
-                    <label style="background: #1a1c1e; color: white; width: 42px; height: 42px; border-radius: 12px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; transition: 0.3s;" title="Adicionar foto">
-                        📷
-                        <input type="file" accept="image/*" style="display: none;" onchange="uploadFotoCorte(event, '${item.id}')">
-                    </label>
+                            
+                            <div style="font-size: 16px; font-weight: 800; color: #1a1c1e; margin-bottom: 2px;">
+                                ${item.cliente_nome || 'Cliente'}
+                            </div>
+                            
+                            <div style="font-size: 13px; color: #d4a373; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                ✂️ ${item.servico || 'Serviço padrão'}
+                            </div>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+                            ${linkWhatsapp ? `
+                                <a href="${linkWhatsapp}" target="_blank" style="text-decoration: none;">
+                                    <div style="background: #25D366; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 12px; font-size: 20px; box-shadow: 0 4px 8px rgba(37,211,102,0.2);">
+                                        📞
+                                    </div>
+                                </a>` : ''}
+                            
+                            <label style="background: #f0f0f0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; font-size: 20px; border: 1px solid #ddd;">
+                                📷
+                                <input type="file" accept="image/*" style="display: none;" onchange="uploadFotoCorte(event, '${item.id}')">
+                            </label>
+                        </div>
+                    </div>
+
+                    ${htmlFotos}
                 </td>
             `;
             corpoAgenda.appendChild(tr);
         });
 
     } catch (err) {
-        console.error("Erro na agenda de clientes:", err);
-        corpoAgenda.innerHTML = '<tr><td colspan="5" style="color:red; text-align:center; padding: 20px;">Erro ao carregar dados.</td></tr>';
+        console.error("Erro na agenda:", err);
+        corpoAgenda.innerHTML = '<tr><td colspan="5" style="color:red; text-align:center; padding: 20px;">Erro ao carregar agenda.</td></tr>';
     }
 }
 
