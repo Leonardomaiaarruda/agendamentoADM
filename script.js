@@ -255,78 +255,81 @@ function mudarTela(tela) {
     if (tela === 'gerar') listarHorarios();
 }
 
-// ==========================================
-// TELA 1: GESTÃO DE VAGAS (LISTAGEM)
-// ==========================================
 
 async function listarHorarios() {
-    if (!corpoTabela) return;
+    const corpoTabela = document.getElementById('corpoTabela');
+    const filtroData = document.getElementById('filtroDataAdm');
     
-    // Tenta recuperar o ID da sessão caso a variável global não tenha sido preenchida
-    if (!barbeiroLogadoId) {
-        const { data: { session } } = await _supabase.auth.getSession();
-        if (session) barbeiroLogadoId = session.user.id;
+    if (!corpoTabela) return;
+
+    let dataParaFiltrar = filtroData ? filtroData.value : "";
+    
+    if (!dataParaFiltrar) {
+        const agora = new Date();
+        const ano = agora.getFullYear();
+        const mes = String(agora.getMonth() + 1).padStart(2, '0');
+        const dia = String(agora.getDate()).padStart(2, '0');
+        dataParaFiltrar = `${ano}-${mes}-${dia}`;
+        if (filtroData) filtroData.value = dataParaFiltrar;
     }
 
-    if (!barbeiroLogadoId) {
-        corpoTabela.innerHTML = "<tr><td colspan='3' style='text-align:center;'>⚠️ Faça login para ver seus horários.</td></tr>";
-        return;
-    }
-
-    corpoTabela.innerHTML = "<tr><td colspan='3' style='text-align:center;'>🔄 Buscando seus horários...</td></tr>";
+    corpoTabela.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 20px;">⌛ Carregando grade...</td></tr>';
 
     try {
         const { data: agendamentos, error } = await _supabase
             .from('agendamentos')
             .select('*')
-            .eq('barbearia_id', BARBEARIA_ID)
-            .or(`barbeiro_id.eq.${barbeiroLogadoId},barbeiro_id.is.null`) // MOSTRA AS DELE E AS QUE ESTÃO SEM DONO
-            .order('data', { ascending: true })
+            .eq('barbeiro_id', barbeiroLogadoId) 
+            .eq('data', dataParaFiltrar)
             .order('horario', { ascending: true });
 
         if (error) throw error;
 
-        corpoTabela.innerHTML = ""; 
-        const agora = new Date();
-
-        if (agendamentos.length === 0) {
-            corpoTabela.innerHTML = "<tr><td colspan='3' style='text-align:center; padding: 20px;'>Nenhum horário encontrado.</td></tr>";
+        if (!agendamentos || agendamentos.length === 0) {
+            corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:40px; color:#888;">Nenhuma vaga para este dia.</td></tr>`;
             return;
         }
 
-        agendamentos.forEach(item => {
-            const [ano, mes, dia] = item.data.split('-');
-            const [horas, minutos] = item.horario.split(':');
-            const dataHoraItem = new Date(ano, mes - 1, dia, horas, minutos);
-            const jaPassou = dataHoraItem < agora;
+        corpoTabela.innerHTML = '';
 
-            const row = document.createElement('tr');
-            if (jaPassou) row.style.opacity = "0.5";
+        agendamentos.forEach(vaga => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = "1px solid #eee";
+            
+            const statusCor = vaga.status === 'disponivel' ? '#2dce89' : '#f5365c';
+            const statusTexto = vaga.status === 'disponivel' ? 'Livre' : (vaga.cliente_nome || 'Ocupado');
 
-            // Se for uma vaga antiga (sem dono), adiciona um aviso visual discreto
-            const infoVaga = !item.barbeiro_id ? "Disponivel" : (item.servico || (item.status === 'disponivel' ? 'Livre' : 'Ocupado'));
-
-            row.innerHTML = `
-                <td data-label="Data/Hora"><strong>${dia}/${mes}</strong><br><span>às ${item.horario.substring(0,5)}</span></td>
-                <td data-label="Status/Serviço">
-                    <span class="badge-status ${item.status === 'disponivel' ? 'status-verde' : 'status-azul'}">
-                        ${infoVaga}
-                    </span>
+            tr.innerHTML = `
+                <td style="padding: 12px; font-weight: 700; color: #333;">
+                    ${vaga.horario.substring(0, 5)}
                 </td>
-                <td data-label="Ação">
-                    <div style="display: flex; gap: 5px; justify-content: flex-end;">
-                        <button class="btn-edit" onclick='prepararEdicao(${JSON.stringify(item)})'>✏️</button>
-                        <button class="btn-delete" onclick="deletarVaga('${item.id}')">🗑️</button>
+                <td style="padding: 12px;">
+                    <div style="display: flex; flex-direction: column;">
+                        <span style="font-size: 11px; font-weight: 700; color: ${statusCor};">
+                            ● ${vaga.status === 'disponivel' ? 'DISPONÍVEL' : 'RESERVADO'}
+                        </span>
+                        <span style="font-size: 13px; color: #555;">
+                            ${vaga.status === 'disponivel' ? 'Vaga aberta' : statusTexto}
+                        </span>
                     </div>
                 </td>
+                <td style="padding: 12px; text-align: right; white-space: nowrap;">
+                    <button onclick="editarVaga('${vaga.id}')" style="background: #f0f0f0; border: none; padding: 10px; border-radius: 8px; cursor: pointer; margin-right: 5px;">✏️</button>
+                    <button onclick="excluirVaga('${vaga.id}')" style="background: #fff0f0; border: none; padding: 10px; border-radius: 8px; cursor: pointer;">🗑️</button>
+                </td>
             `;
-            corpoTabela.appendChild(row);
+            corpoTabela.appendChild(tr);
         });
-    } catch (e) {
-        console.error("Erro ao listar:", e);
-        corpoTabela.innerHTML = "<tr><td colspan='3' style='text-align:center; color:red;'>Erro ao carregar dados.</td></tr>";
+
+        const statVagas = document.getElementById('stat-vagas');
+        if (statVagas) statVagas.innerText = agendamentos.length;
+
+    } catch (err) {
+        console.error(err);
+        corpoTabela.innerHTML = '<tr><td colspan="3" style="color:red; text-align:center;">Erro ao carregar.</td></tr>';
     }
 }
+
 async function deletarVaga(id) {
     if (!confirm("Excluir esta vaga permanentemente?")) return;
     exibirStatus("🗑️ Removendo...");
@@ -341,62 +344,96 @@ async function deletarVaga(id) {
 // TELA 2: AGENDA DE CLIENTES (HISTÓRICO)
 // ==========================================
 async function listarAgendaClientes() {
-    const corpo = document.getElementById('corpoAgenda');
-    if(!corpo) return;
+    const corpoAgenda = document.getElementById('corpoAgenda');
+    if (!corpoAgenda) return;
 
-    if (!barbeiroLogadoId) {
-        corpo.innerHTML = "<tr><td colspan='7' style='text-align:center; color:orange;'>⚠️ Identificação do profissional não encontrada.</td></tr>";
-        return;
-    }
-
-    corpo.innerHTML = "<tr><td colspan='7' style='text-align:center;'>⏳ Buscando compromissos...</td></tr>";
+    corpoAgenda.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">⌛ Carregando compromissos...</td></tr>';
 
     try {
-        // 1. Mudança no SELECT: pedimos os dados de agendamentos E o nome da tabela barbeiros
-        const { data, error } = await _supabase
+        const { data: agendamentos, error } = await _supabase
             .from('agendamentos')
-            .select(`
-                *,
-                barbeiros ( nome )
-            `)
-            .eq('barbearia_id', BARBEARIA_ID)
-            .eq('barbeiro_id', barbeiroLogadoId) 
-            .neq('status', 'disponivel')
+            .select('*')
+            .eq('barbeiro_id', barbeiroLogadoId)
+            .neq('status', 'disponivel') 
             .order('data', { ascending: true })
             .order('horario', { ascending: true });
 
         if (error) throw error;
 
-        if (!data || data.length === 0) {
-            corpo.innerHTML = "<tr><td colspan='7' style='text-align:center;'>Nenhum agendamento encontrado.</td></tr>";
+        if (!agendamentos || agendamentos.length === 0) {
+            corpoAgenda.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">Você não tem clientes agendados.</td></tr>';
             return;
         }
 
-        corpo.innerHTML = data.map(h => {
-            const [ano, mes, dia] = h.data.split('-');
-            const concluido = h.status === 'concluido';
+        corpoAgenda.innerHTML = '';
+
+        agendamentos.forEach(item => {
+            const tr = document.createElement('tr');
+            const dataBr = item.data.split('-').reverse().join('/');
             
-            // O nome do barbeiro virá dentro do objeto 'barbeiros'
-            const nomeProfissional = h.barbeiros ? h.barbeiros.nome : '---';
-            
-            return `
-                <tr style="${concluido ? 'background: #f4fdf4; opacity: 0.8;' : ''}">
-                    <td data-label="Horário">${dia}/${mes} ${h.horario.substring(0,5)}</td>
-                    <td data-label="Barbeiro"><strong>${nomeProfissional}</strong></td>
-                    <td data-label="Cliente">${h.cliente_nome || '---'}</td>
-                    <td data-label="Serviço">${h.servico || '---'}</td>
-                    <td data-label="Valor" style="color:green; font-weight:bold;">R$ ${h.preco_final ? h.preco_final.toFixed(2).replace('.',',') : '0,00'}</td>
-                    <td data-label="Contato">
-                        ${h.cliente_whatsapp ? `<a href="https://wa.me/55${h.cliente_whatsapp}" target="_blank" class="btn-whats">📱 WhatsApp</a>` : '---'}
-                    </td>
-                    <td data-label="Ação">
-                        ${concluido ? '✅' : `<button onclick="concluirAtendimento('${h.id}')" class="btn-check">Concluir</button>`}
-                    </td>
-                </tr>`;
-        }).join('');
-    } catch (e) {
-        console.error("Erro ao listar agenda:", e);
-        corpo.innerHTML = "<tr><td colspan='7' style='text-align:center; color:red;'>Erro ao carregar agenda.</td></tr>";
+            const celularBruto = item['cliente-whatsapp'] || "";
+            const numeroLimpo = celularBruto.replace(/\D/g, '');
+
+            let linkWhatsapp = "";
+            if (numeroLimpo.length >= 10) {
+                const prefixo = numeroLimpo.startsWith('55') ? '' : '55';
+                linkWhatsapp = `https://wa.me/${prefixo}${numeroLimpo}`;
+            }
+
+            // --- LÓGICA DE FOTOS CORRIGIDA ---
+            let htmlFotos = '';
+            // Verificamos se existe o array e se ele tem conteúdo real
+            const listaFotos = item.foto_corte; 
+
+            if (Array.isArray(listaFotos) && listaFotos.length > 0) {
+                // Filtramos possíveis valores nulos ou vazios que sobraram de testes antigos
+                const fotosValidas = listaFotos.filter(url => url && url !== "null" && url !== "");
+                
+                if (fotosValidas.length > 0) {
+                    htmlFotos = '<div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">';
+                    htmlFotos += fotosValidas.map(url => `
+                        <div style="position: relative;">
+                            <img src="${url}" onclick="window.open('${url}', '_blank')" 
+                                 style="width: 55px; height: 55px; border-radius: 8px; object-fit: cover; border: 2px solid #d4a373; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        </div>
+                    `).join('');
+                    htmlFotos += '</div>';
+                }
+            }
+
+            tr.innerHTML = `
+                <td style="padding: 12px; vertical-align: middle;">
+                    <div style="font-weight: bold; color: #333;">${item.horario.substring(0, 5)}</div>
+                    <div style="font-size: 11px; color: #777;">${dataBr}</div>
+                </td>
+                <td style="padding: 12px; vertical-align: middle;">
+                    <div style="font-weight: 700; color: #1a1c1e; font-size: 14px;">${item.cliente_nome || 'Cliente'}</div>
+                    <div style="font-size: 12px; color: #d4a373; font-weight: 600; margin-top: 2px;">${item.servico || 'Serviço não definido'}</div>
+                    ${htmlFotos}
+                </td>
+                <td style="padding: 12px; text-align: center; vertical-align: middle;">
+                    ${linkWhatsapp ? 
+                        `<a href="${linkWhatsapp}" target="_blank" style="text-decoration: none;">
+                            <div style="background: #25D366; color: white; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin: 0 auto; font-size: 18px; box-shadow: 0 2px 5px rgba(0,0,0,0.15);">
+                                📞
+                            </div>
+                        </a>` : 
+                        '<span style="color: #ccc; font-size: 10px;">-</span>'
+                    }
+                </td>
+                <td style="padding: 12px; text-align: right; vertical-align: middle;">
+                    <label style="background: #1a1c1e; color: white; width: 42px; height: 42px; border-radius: 12px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; transition: 0.3s;" title="Adicionar foto">
+                        📷
+                        <input type="file" accept="image/*" style="display: none;" onchange="uploadFotoCorte(event, '${item.id}')">
+                    </label>
+                </td>
+            `;
+            corpoAgenda.appendChild(tr);
+        });
+
+    } catch (err) {
+        console.error("Erro na agenda de clientes:", err);
+        corpoAgenda.innerHTML = '<tr><td colspan="5" style="color:red; text-align:center; padding: 20px;">Erro ao carregar dados.</td></tr>';
     }
 }
 
@@ -414,11 +451,22 @@ async function concluirAtendimento(id) {
 
 async function carregarServicosBD() {
     try {
-        const { data, error } = await _supabase.from('servicos').select('*').eq('barbearia_id', BARBEARIA_ID);
+        const { data, error } = await _supabase
+            .from('servicos')
+            .select('*')
+            .eq('barbearia_id', BARBEARIA_ID)
+            .order('nome', { ascending: true });
+
         if (error) throw error;
+
+        // Atualiza a lista local para o modal
         listaServicosLocal = data.map(s => `${s.nome} - R$ ${parseFloat(s.preco).toFixed(2).replace('.', ',')}`);
+        
+        // Atualiza o <select> do formulário de criação de vagas
         atualizarSelectServicos();
-    } catch (e) { console.error("Erro serviços:", e); }
+    } catch (e) { 
+        console.error("Erro ao carregar serviços:", e); 
+    }
 }
 
 function atualizarSelectServicos() {
@@ -451,21 +499,68 @@ function renderizarListaConfig() {
     `).join('');
 }
 
-function adicionarServicoLista() {
-    const nome = document.getElementById('novoServicoNome').value;
-    const preco = document.getElementById('novoServicoPreco').value;
-    if(nome && preco) {
-        listaServicosLocal.push(`${nome} - R$ ${preco.replace('.', ',')}`);
-        renderizarListaConfig();
-        atualizarSelectServicos();
-        document.getElementById('novoServicoNome').value = '';
-        document.getElementById('novoServicoPreco').value = '';
+async function adicionarServicoLista() {
+    const nomeInput = document.getElementById('novoServicoNome');
+    const precoInput = document.getElementById('novoServicoPreco');
+    
+    const nome = nomeInput.value.trim();
+    // Limpa o preço para aceitar pontos ou vírgulas e converter para número
+    const preco = precoInput.value.replace('R$', '').replace(',', '.').trim();
+
+    if (!nome || !preco) {
+        alert("⚠️ Preencha o nome e o preço do serviço.");
+        return;
+    }
+
+    try {
+        // 1. Salva no banco de dados Supabase
+        const { error } = await _supabase
+            .from('servicos')
+            .insert([{ 
+                nome: nome, 
+                preco: parseFloat(preco), 
+                barbearia_id: BARBEARIA_ID 
+            }]);
+
+        if (error) throw error;
+
+        // 2. Limpa os campos do modal
+        nomeInput.value = '';
+        precoInput.value = '';
+        
+        // 3. ATUALIZAÇÃO EM TEMPO REAL:
+        // Recarrega os serviços do banco para a lista local e para o formulário
+        await carregarServicosBD(); 
+        renderizarListaConfig(); // Atualiza a lista visual dentro do modal
+        
+        exibirStatus("✅ Serviço adicionado!");
+    } catch (e) {
+        console.error("Erro ao salvar serviço:", e);
+        alert("Erro ao salvar serviço no banco de dados.");
     }
 }
 
-function removerServicoLista(index) {
-    listaServicosLocal.splice(index, 1);
-    renderizarListaConfig();
+async function removerServicoLista(index) {
+    const servicoTexto = listaServicosLocal[index];
+    const nomeServico = servicoTexto.split(' - R$ ')[0]; // Pega só o nome antes do preço
+
+    if (!confirm(`Deseja excluir o serviço "${nomeServico}"?`)) return;
+
+    try {
+        const { error } = await _supabase
+            .from('servicos')
+            .delete()
+            .eq('nome', nomeServico)
+            .eq('barbearia_id', BARBEARIA_ID);
+
+        if (error) throw error;
+
+        await carregarServicosBD(); // Recarrega do banco
+        renderizarListaConfig();    // Atualiza modal
+        exibirStatus("🗑️ Serviço removido!");
+    } catch (e) {
+        console.error(e);
+    }
 }
 
 async function salvarServicosNoGoogle() { 
@@ -775,8 +870,7 @@ async function uploadFotoPerfil(event) {
         alert("Foto atualizada!");
 
     } catch (err) {
-        console.error("Erro detalhado no upload:", err);
-        alert("Erro ao salvar foto no banco de dados.");
+       
     }
 }
 
@@ -1272,3 +1366,57 @@ async function verificarPermissoes() {
 }
 
 
+async function uploadFotoCorte(event, agendamentoId) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    exibirStatus("⏳ Enviando foto...");
+
+    try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${agendamentoId}_${Date.now()}.${fileExt}`;
+        const filePath = `cortes/${fileName}`;
+
+        // 1. Envia o arquivo para o Storage
+        const { error: uploadError } = await _supabase.storage
+            .from('fotos_cortes')
+            .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        // 2. Pega a URL pública
+        const { data: { publicUrl } } = _supabase.storage
+            .from('fotos_cortes')
+            .getPublicUrl(filePath);
+
+        // 3. Busca a lista atual de fotos do agendamento
+        const { data: agendamento, error: selectError } = await _supabase
+            .from('agendamentos')
+            .select('foto_corte')
+            .eq('id', agendamentoId)
+            .single();
+
+        if (selectError) throw selectError;
+
+        // Garante que fotosAtuais seja um array (pode vir null do banco)
+        let fotosAtuais = agendamento.foto_corte || [];
+        
+        // Adiciona a nova URL à lista
+        fotosAtuais.push(publicUrl);
+
+        // 4. Atualiza o banco com a lista completa
+        const { error: updateError } = await _supabase
+            .from('agendamentos')
+            .update({ foto_corte: fotosAtuais }) // Envia o array atualizado
+            .eq('id', agendamentoId);
+
+        if (updateError) throw updateError;
+
+        exibirStatus("✅ Foto adicionada!");
+        listarAgendaClientes(); // Recarrega para mostrar a nova foto
+
+    } catch (e) {
+        console.error("Erro no upload múltiplo:", e);
+        alert("Erro ao enviar foto. Verifique o console.");
+    }
+}
