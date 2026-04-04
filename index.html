@@ -24,19 +24,14 @@
                 <input type="password" id="login-senha" placeholder="••••••••" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px;">
             </div>
 
-            
             <button id="btn-login" onclick="executarLogin()" class="btn-primario" style="width: 100%; padding: 15px; background: #d4a373; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer;">Entrar no Painel</button>
             <p id="login-erro" style="color: #f5365c; font-size: 0.8rem; margin-top: 15px; display: none;"></p>
-       
-
-    <p style="margin-top: 15px; font-size: 0.85rem;">
-        <a href="javascript:void(0)" onclick="solicitarRecuperacaoSenha()" style="color: #d4a373; text-decoration: none; font-weight: 600;">
-            Esqueci minha senha
-        </a>
-    </p>
+            
+            <p style="margin-top: 15px; font-size: 0.85rem;">
+                <a href="javascript:void(0)" onclick="solicitarRecuperacaoSenha()" style="color: #d4a373; text-decoration: none; font-weight: 600;">Esqueci minha senha</a>
+            </p>
         </div>
     </div>
-
 
     <div class="main-container">
         <header class="app-header">
@@ -46,16 +41,10 @@
                         src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" 
                         style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid #d4a373; background: #f0f0f0;">
                     
-                    <label for="fotoInput" style="position: absolute; bottom: 0; right: 0; background: #d4a373; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid white; font-size: 14px;">
-                        📷
-                    </label>
-                    
+                    <label for="fotoInput" style="position: absolute; bottom: 0; right: 0; background: #d4a373; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid white; font-size: 14px;">📷</label>
                     <input type="file" id="fotoInput" accept="image/*" style="display: none;" onchange="uploadFotoPerfil(event)">
                 </div>
-                <button onclick="abrirModalSenha()" class="btn-outline" style="padding: 5px 10px; font-size: 12px;">
-                    🔑 Mudar Senha
-                </button>
-                
+                <button onclick="abrirModalSenha()" class="btn-outline" style="padding: 5px 10px; font-size: 12px; margin-top: 8px;">🔑 Mudar Senha</button>
                 <div id="statusUpload" style="font-size: 10px; color: #666; margin-top: 5px; height: 12px; text-align: center;"></div>
             </div>
 
@@ -92,11 +81,11 @@
                     <span class="stat-label">Total de Vagas</span>
                     <span id="stat-vagas" class="stat-value">--</span>
                 </div>
-                <button class="btn-add-float" id="btnAbrirForm" onclick="toggleFormulario()">➕ Criar Vagas</button>
+                <button class="btn-add-float" id="btnAbrirForm" onclick="toggleFormulario()">➕ Gerar Horários</button>
             </div>
 
-            <section id="form-container" class="card hidden anim-up">
-                <h2 id="titulo-form">Configurar Nova Grade</h2>
+            <section id="form-container" class="card hidden anim-up" style="margin-bottom: 20px;">
+                <h2 id="titulo-form">Configurar Grade de Horários</h2>
                 <form id="scheduleForm">
                     <div class="form-row">
                         <div class="form-group">
@@ -140,57 +129,64 @@
                                 <option value="90">90 min</option>
                             </select>
                         </div>
-
-                        <div id="secaoAlmoco" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-                            <div>
-                                <label style="font-size: 0.8rem; color: var(--gray);">Início Almoço</label>
-                                <input type="time" id="almocoInicio" class="input-field">
-                            </div>
-                            <div>
-                                <label style="font-size: 0.8rem; color: var(--gray);">Fim Almoço</label>
-                                <input type="time" id="almocoFim" class="input-field">
-                            </div>
-                        </div>
-
                         <div class="form-group">
                             <label>Serviço Fixo (opcional)</label>
                             <select id="servico"></select>
                         </div>
                     </div>
+
+                    <div id="secaoAlmoco" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; margin-bottom: 15px;">
+                        <div>
+                            <label style="font-size: 0.8rem; color: #666;">Início Almoço</label>
+                            <input type="time" id="almocoInicio" class="input-field">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.8rem; color: #666;">Fim Almoço</label>
+                            <input type="time" id="almocoFim" class="input-field">
+                        </div>
+                    </div>
+
                     <button type="submit" id="btnSalvar" class="btn-primario">Gerar Horários</button>
                 </form>
             </section>
 
             <div class="card table-container">
-                <table>
+                <div class="filtro-agenda-adm" style="padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; background: #fafafa; border-radius: 12px 12px 0 0;">
+                    <label for="filtroDataAdm" style="font-size: 0.85rem; font-weight: 600; color: #555;">📅 Ver agenda do dia:</label>
+                    <input type="date" id="filtroDataAdm" onchange="listarHorarios()" style="padding: 8px; border-radius: 8px; border: 1px solid #ddd; outline: none; font-family: inherit;">
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse;">
                     <thead>
-                        <tr>
-                            <th>Data/Hora</th>
-                            <th>Status/Serviço</th>
-                            <th style="text-align: right;">Ações</th>
+                        <tr style="background: #fdfdfd;">
+                            <th style="text-align: left; padding: 12px;">Horário</th>
+                            <th style="text-align: left; padding: 12px;">Status/Serviço</th>
+                            <th style="text-align: right; padding: 12px;">Ações</th>
                         </tr>
                     </thead>
-                    <tbody id="corpoTabela"></tbody>
+                    <tbody id="corpoTabela">
+                        </tbody>
                 </table>
             </div>
         </main>
 
         <main id="tela-agenda" class="tela-content hidden">
             <div class="card table-container">
-                <h2 style="padding: 20px;">📅 Próximos Agendamentos</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Horário</th>
-                            <th>Cliente</th>
-                            <th>Serviço</th>
-                            <th>Valor</th>
-                            <th>Contato</th>
-                            <th>Ação</th>
-                        </tr>
-                    </thead>
-                    <tbody id="corpoAgenda"></tbody>
-                </table>
+                <h2 style="padding: 20px;">📅 Meus Compromissos</h2>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data/Hora</th>
+                                <th>Cliente</th>
+                                <th>Serviço</th>
+                                <th>Contato</th>
+                                <th style="text-align: right;">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="corpoAgenda"></tbody>
+                    </table>
+                </div>
             </div>
         </main>
     </div>
@@ -230,9 +226,7 @@
                 <label style="margin-top:10px; display:block;">Senha Inicial</label>
                 <input type="password" id="novoBarbeiroSenha" placeholder="Mínimo 6 caracteres">
 
-                <button onclick="realizarCadastroCompleto()" id="btnCadastrarEquipe" class="btn-primario" style="margin-top: 15px; width: 100%;">
-                    Registrar e Criar Acesso
-                </button>
+                <button onclick="realizarCadastroCompleto()" id="btnCadastrarEquipe" class="btn-primario" style="margin-top: 15px; width: 100%;">Registrar e Criar Acesso</button>
                 <p id="statusCadastro" style="font-size: 11px; text-align: center; margin-top: 8px; display: none;"></p>
             </div>
 
@@ -244,7 +238,6 @@
     <div id="modalSenha" class="modal-overlay hidden">
         <div class="modal-content-centered">
             <button onclick="fecharModalSenha()" class="btn-close-modal">&times;</button>
-            
             <h3 style="margin-bottom: 20px; text-align: center;">🔐 Alterar Senha</h3>
             
             <label style="font-size: 0.85rem; font-weight: 600;">Nova Senha</label>
@@ -253,15 +246,12 @@
             <label style="font-size: 0.85rem; font-weight: 600;">Confirmar Nova Senha</label>
             <input type="password" id="confirmarSenhaInput" class="input-field" placeholder="Repita a senha" style="width: 100%; margin-bottom: 20px;">
             
-            <button onclick="executarTrocaSenha()" id="btnConfirmarSenha" class="btn-primario" style="width: 100%;">
-                Atualizar Senha
-            </button>
-            
+            <button onclick="executarTrocaSenha()" id="btnConfirmarSenha" class="btn-primario" style="width: 100%;">Atualizar Senha</button>
             <p id="statusSenha" style="font-size: 12px; text-align: center; margin-top: 15px; display: none;"></p>
         </div>
     </div>
 
-    <div id="status" style="position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 1000; background: #333; color: white; padding: 12px 24px; border-radius: 30px; display: none;"></div>
+    <div id="status" style="position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 1000; background: #333; color: white; padding: 12px 24px; border-radius: 30px; display: none; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
