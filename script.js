@@ -347,7 +347,7 @@ async function listarAgendaClientes() {
     const corpoAgenda = document.getElementById('corpoAgenda');
     if (!corpoAgenda) return;
 
-    corpoAgenda.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">⌛ Carregando compromissos...</td></tr>';
+    corpoAgenda.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 25px; color: #666;">⌛ Carregando agenda...</td></tr>';
 
     try {
         const { data: agendamentos, error } = await _supabase
@@ -361,7 +361,7 @@ async function listarAgendaClientes() {
         if (error) throw error;
 
         if (!agendamentos || agendamentos.length === 0) {
-            corpoAgenda.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:#888;">Nenhum cliente agendado.</td></tr>';
+            corpoAgenda.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:40px; color:#999;">Nenhum cliente agendado.</td></tr>';
             return;
         }
 
@@ -369,64 +369,71 @@ async function listarAgendaClientes() {
 
         agendamentos.forEach(item => {
             const tr = document.createElement('tr');
-            const dataBr = item.data.split('-').reverse().join('/');
-            const celularBruto = item['cliente-whatsapp'] || "";
-            const numeroLimpo = celularBruto.replace(/\D/g, '');
-            let linkWhatsapp = numeroLimpo.length >= 10 ? `https://wa.me/${numeroLimpo.startsWith('55') ? '' : '55'}${numeroLimpo}` : "";
+            tr.style.borderBottom = "1px solid #eee";
 
-            // Lógica de Galeria de Fotos
+            const dataBr = item.data.split('-').reverse().join('/');
+            const celularBruto = item.cliente_whatsapp || ""; 
+            const numeroLimpo = celularBruto.replace(/\D/g, '');
+            
+            // Link direto para o chat
+            let linkChat = numeroLimpo.length >= 10 ? `https://wa.me/55${numeroLimpo.startsWith('55') ? numeroLimpo.substring(2) : numeroLimpo}` : "";
+
+            // --- LÓGICA DE FOTOS ---
             let htmlFotos = '';
             if (Array.isArray(item.foto_corte) && item.foto_corte.length > 0) {
                 const fotosValidas = item.foto_corte.filter(url => url && url !== "null");
                 if (fotosValidas.length > 0) {
-                    htmlFotos = `
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee;">
-                            ${fotosValidas.map(url => `
-                                <img src="${url}" onclick="window.open('${url}', '_blank')" 
-                                     style="width: 60px; height: 60px; border-radius: 10px; object-fit: cover; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                            `).join('')}
-                        </div>`;
+                    htmlFotos = `<div class="cliente-fotos-bloco">
+                        ${fotosValidas.map(url => `
+                            <img src="${url}" onclick="window.open('${url}', '_blank')" 
+                                 class="foto-corte-agendamento" title="Clique para ampliar">
+                        `).join('')}
+                    </div>`;
                 }
             }
 
-            // Design em modo "Card" para cada linha da tabela
             tr.innerHTML = `
-                <td colspan="5" style="padding: 15px; border-bottom: 8px solid #f8f9fa;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        
-                        <div style="flex: 1;">
-                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
-                                <span style="background: #1a1c1e; color: white; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 14px;">
-                                    ${item.horario.substring(0, 5)}
-                                </span>
-                                <span style="font-size: 12px; color: #777; font-weight: 600;">${dataBr}</span>
-                            </div>
-                            
-                            <div style="font-size: 16px; font-weight: 800; color: #1a1c1e; margin-bottom: 2px;">
-                                ${item.cliente_nome || 'Cliente'}
-                            </div>
-                            
-                            <div style="font-size: 13px; color: #d4a373; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                                ✂️ ${item.servico || 'Serviço padrão'}
-                            </div>
-                        </div>
+                <td style="padding: 12px 8px; vertical-align: middle; white-space: nowrap;">
+                    <div style="font-weight: 800; color: #1a1c1e; font-size: 14px;">${item.horario.substring(0, 5)}</div>
+                    <div style="font-size: 11px; color: #888;">${dataBr}</div>
+                </td>
 
-                        <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
-                            ${linkWhatsapp ? `
-                                <a href="${linkWhatsapp}" target="_blank" style="text-decoration: none;">
-                                    <div style="background: #25D366; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 12px; font-size: 20px; box-shadow: 0 4px 8px rgba(37,211,102,0.2);">
-                                        📞
-                                    </div>
-                                </a>` : ''}
-                            
-                            <label style="background: #f0f0f0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; font-size: 20px; border: 1px solid #ddd;">
-                                📷
-                                <input type="file" accept="image/*" style="display: none;" onchange="uploadFotoCorte(event, '${item.id}')">
-                            </label>
+                <td style="padding: 12px 8px; vertical-align: middle;">
+                    <div class="celula-cliente-container">
+                        <div class="cliente-nome-tabela" style="font-weight: 600;">
+                            ${item.cliente_nome || 'Não informado'}
                         </div>
+                        ${htmlFotos}
                     </div>
+                </td>
 
-                    ${htmlFotos}
+                <td style="padding: 12px 8px; vertical-align: middle; font-size: 13px; color: #555;">
+                    ${item.servico || 'Corte'}
+                </td>
+
+                <td style="padding: 12px 8px; vertical-align: middle;">
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                        
+                        ${linkChat ? `
+                            <button onclick="enviarLembreteDireto('${item.cliente_nome}', '${item.horario}', '${numeroLimpo}')" 
+                                style="background: #25D366; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" title="Enviar Lembrete">
+                                🔔 AVISAR
+                            </button>
+                        ` : ''}
+
+                        ${linkChat ? `
+                            <a href="${linkChat}" target="_blank" style="text-decoration: none;">
+                                <div style="background: #f0f0f0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 14px; border: 1px solid #ddd;">
+                                    💬
+                                </div>
+                            </a>` : '<span style="color:#ccc; font-size:10px;">-</span>'}
+                        
+                        <label style="background: #f0f0f0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; font-size: 14px; border: 1px solid #ddd;" title="Adicionar Foto">
+                            📷
+                            <input type="file" accept="image/*" style="display: none;" onchange="uploadFotoCorte(event, '${item.id}')">
+                        </label>
+
+                    </div>
                 </td>
             `;
             corpoAgenda.appendChild(tr);
@@ -434,7 +441,7 @@ async function listarAgendaClientes() {
 
     } catch (err) {
         console.error("Erro na agenda:", err);
-        corpoAgenda.innerHTML = '<tr><td colspan="5" style="color:red; text-align:center; padding: 20px;">Erro ao carregar agenda.</td></tr>';
+        corpoAgenda.innerHTML = '<tr><td colspan="4" style="color:red; text-align:center; padding: 20px;">Erro ao carregar dados.</td></tr>';
     }
 }
 
@@ -1420,4 +1427,41 @@ async function uploadFotoCorte(event, agendamentoId) {
         console.error("Erro no upload múltiplo:", e);
         alert("Erro ao enviar foto. Verifique o console.");
     }
+}
+
+
+function enviarLembreteManual(nome, horario, telefone) {
+    const numLimpo = telefone.replace(/\D/g, '');
+    const mensagem = `Olá ${nome}! ✂️ Confirmamos seu horário hoje às ${horario.substring(0,5)}. Te esperamos!`;
+    const url = `https://wa.me/55${numLimpo}?text=${encodeURIComponent(mensagem)}`;
+    
+    window.open(url, '_blank');
+}
+
+
+
+function enviarLembreteWhatsapp(nome, horario, whatsapp) {
+    const numLimpo = whatsapp.replace(/\D/g, '');
+    const msg = encodeURIComponent(`Olá ${nome}! ✂️ Passando para confirmar seu horário hoje às ${horario.substring(0,5)}. Te esperamos!`);
+    
+    // Abre em uma nova aba (funciona no PC e Celular)
+    window.open(`https://wa.me/55${numLimpo}?text=${msg}`, '_blank');
+}
+
+
+function enviarLembreteDireto(nome, horario, telefone) {
+    const numLimpo = telefone.replace(/\D/g, '');
+    const apenasHora = horario.substring(0, 5);
+    
+    const saudacao = () => {
+        const hora = new Date().getHours();
+        if (hora < 12) return "Bom dia";
+        if (hora < 18) return "Boa tarde";
+        return "Boa noite";
+    };
+
+    const mensagem = `${saudacao()}, ${nome}! ✂️\n\nPassando para confirmar seu horário hoje às *${apenasHora}* na barbearia. Tudo certo?\n\nTe esperamos!`;
+    
+    const url = `https://wa.me/55${numLimpo}?text=${encodeURIComponent(mensagem)}`;
+    window.open(url, '_blank');
 }
