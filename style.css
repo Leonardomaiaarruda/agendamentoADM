@@ -239,6 +239,20 @@ button { cursor: pointer; border: none; font-family: inherit; }
     padding-bottom: 30px; /* Espaço extra para não ficar colado na borda do celular */
 }
 
+
+
+.btn-whatsapp-lembrete {
+    background-color: #25D366;
+    color: white;
+    border: none;
+    padding: 8px;
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+
+
 /* --- RESPONSIVIDADE MOBILE --- */
 @media (max-width: 768px) {
     .main-container { padding: 15px; }
@@ -365,6 +379,48 @@ button { cursor: pointer; border: none; font-family: inherit; }
     box-shadow: 0 20px 40px rgba(0,0,0,0.3);
     position: relative;
     animation: scaleIn 0.3s ease;
+}
+
+
+
+/* Container da Célula do Cliente (Nome + Fotos) */
+.celula-cliente-container {
+    display: flex;
+    flex-direction: column; /* Força o empilhamento vertical (Nome em cima, Fotos embaixo) */
+    gap: 8px; /* Espaço entre o nome e o bloco de fotos */
+    padding: 10px 0;
+}
+
+/* Estilo do Nome do Cliente */
+.cliente-nome-tabela {
+    font-weight: 700; 
+    color: #1a1c1e;
+    font-size: 15px;
+    text-transform: capitalize;
+    white-space: normal; /* Permite que nomes longos quebrem linha se necessário */
+}
+
+/* Bloco que contém as miniaturas */
+.cliente-fotos-bloco {
+    display: flex;
+    flex-wrap: wrap; /* Permite que as fotos pulem para a linha de baixo se forem muitas */
+    gap: 6px; /* Espaço entre as fotos */
+}
+
+/* Estilo das Miniaturas (Maiores agora) */
+.foto-corte-agendamento {
+    width: 55px; /* Aumentado para melhor visualização */
+    height: 55px; 
+    border-radius: 8px; 
+    object-fit: cover; 
+    border: 2px solid #d4a373; /* Borda dourada/bronze */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.foto-corte-agendamento:hover {
+    transform: scale(1.05); /* Efeito de zoom ao passar o mouse */
 }
 
 @keyframes scaleIn {
