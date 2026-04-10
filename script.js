@@ -285,6 +285,11 @@ async function listarHorarios() {
 
         if (error) throw error;
 
+        // --- GATILHO DE ALERTA ATIVADO PARA A TELA DE VAGAS ---
+        if (agendamentos && agendamentos.length > 0) {
+            verificarProximosAtendimentos(agendamentos);
+        }
+
         if (!agendamentos || agendamentos.length === 0) {
             corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:40px; color:#888;">Nenhuma vaga para este dia.</td></tr>`;
             return;
@@ -360,6 +365,11 @@ async function listarAgendaClientes() {
 
         if (error) throw error;
 
+        // --- GATILHO DO ALERTA DE 1 HORA ---
+        if (agendamentos && agendamentos.length > 0) {
+            verificarProximosAtendimentos(agendamentos);
+        }
+
         if (!agendamentos || agendamentos.length === 0) {
             corpoAgenda.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:40px; color:#999;">Nenhum cliente agendado.</td></tr>';
             return;
@@ -374,11 +384,8 @@ async function listarAgendaClientes() {
             const dataBr = item.data.split('-').reverse().join('/');
             const celularBruto = item.cliente_whatsapp || ""; 
             const numeroLimpo = celularBruto.replace(/\D/g, '');
-            
-            // Link direto para o chat
             let linkChat = numeroLimpo.length >= 10 ? `https://wa.me/55${numeroLimpo.startsWith('55') ? numeroLimpo.substring(2) : numeroLimpo}` : "";
 
-            // --- LÓGICA DE FOTOS ---
             let htmlFotos = '';
             if (Array.isArray(item.foto_corte) && item.foto_corte.length > 0) {
                 const fotosValidas = item.foto_corte.filter(url => url && url !== "null");
@@ -413,7 +420,6 @@ async function listarAgendaClientes() {
 
                 <td style="padding: 12px 8px; vertical-align: middle;">
                     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                        
                         ${linkChat ? `
                             <button onclick="enviarLembreteDireto('${item.cliente_nome}', '${item.horario}', '${numeroLimpo}')" 
                                 style="background: #25D366; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" title="Enviar Lembrete">
@@ -432,7 +438,6 @@ async function listarAgendaClientes() {
                             📷
                             <input type="file" accept="image/*" style="display: none;" onchange="uploadFotoCorte(event, '${item.id}')">
                         </label>
-
                     </div>
                 </td>
             `;
@@ -1465,3 +1470,126 @@ function enviarLembreteDireto(nome, horario, telefone) {
     const url = `https://wa.me/55${numLimpo}?text=${encodeURIComponent(mensagem)}`;
     window.open(url, '_blank');
 }
+
+// Variáveis para gerenciar a fila de alertas
+let filaDeAlertas = [];
+let ultimoClienteAlertadoId = null;
+
+function verificarProximosAtendimentos(agendamentos) {
+    if (!agendamentos) return;
+
+    const agora = new Date();
+    filaDeAlertas = [];
+
+    agendamentos.forEach(item => {
+        // Pula se: sem dados, já enviado, ou vaga disponível
+        if (!item.cliente_nome || !item.cliente_whatsapp || item.lembrete_enviado === true || item.status === 'disponivel') {
+            return;
+        }
+
+        const [ano, mes, dia] = item.data.split('-');
+        const [hora, min] = item.horario.split(':');
+        const dataAgendamento = new Date(ano, mes - 1, dia, hora, min);
+
+        const diferenca = dataAgendamento - agora;
+        const minutosRestantes = Math.floor(diferenca / 1000 / 60);
+
+        // --- LÓGICA DE 1 HORA COM MARGEM DE ATRASO ---
+        // minutosRestantes <= 60: Começa a avisar 1 hora antes
+        // minutosRestantes >= -15: Continua avisando até 15 minutos após o horário ter passado
+        if (minutosRestantes <= 60 && minutosRestantes >= -15) { 
+            filaDeAlertas.push(item);
+        }
+    });
+
+    if (filaDeAlertas.length > 0 && !document.querySelector('.alerta-proximo-cliente')) {
+        exibirProximoDaFila();
+    }
+}
+
+function exibirProximoDaFila() {
+    if (filaDeAlertas.length === 0) return;
+    exibirAlertaVisual(filaDeAlertas[0]);
+}
+
+function exibirAlertaVisual(item) {
+    const alertaAntigo = document.querySelector('.alerta-proximo-cliente');
+    if (alertaAntigo) alertaAntigo.remove();
+
+    const container = document.createElement('div');
+    container.className = 'alerta-proximo-cliente';
+    
+    const restantes = filaDeAlertas.length - 1;
+
+    container.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+                <strong style="color: #25D366;">🔔 Lembrete Pendente ${restantes > 0 ? `(+${restantes})` : ''}</strong>
+                <div style="margin-top: 5px; font-size: 14px;">
+                    <b>${item.cliente_nome}</b> às ${item.horario.substring(0,5)}
+                </div>
+            </div>
+            <button onclick="pularAlerta('${item.id}')" style="background:none; border:none; color:white; cursor:pointer; font-size: 18px;">✕</button>
+        </div>
+        <button class="btn-alerta-whatsapp" style="width: 100%; margin-top: 10px;" onclick="processarProximoDaFila('${item.id}')">
+            ENVIAR MENSAGEM
+        </button>
+    `;
+
+    document.body.appendChild(container);
+    new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => {});
+}
+
+// Função chamada ao clicar no botão de enviar
+async function processarProximoDaFila(id) {
+    // 1. Abre o WhatsApp primeiro (para não ser bloqueado por pop-up)
+    const item = filaDeAlertas[0];
+    const numLimpo = item.cliente_whatsapp.replace(/\D/g, '');
+    const mensagem = encodeURIComponent(`Olá ${item.cliente_nome}! ✂️ Confirmamos seu horário às ${item.horario.substring(0,5)}. Te esperamos!`);
+    window.open(`https://wa.me/55${numLimpo}?text=${mensagem}`, '_blank');
+
+    // 2. Remove da fila local
+    filaDeAlertas.shift();
+    
+    // 3. Marca como enviado no Supabase
+    try {
+        await _supabase
+            .from('agendamentos')
+            .update({ lembrete_enviado: true })
+            .eq('id', id);
+    } catch (error) {
+        console.error("Erro ao salvar status:", error);
+    }
+
+    // 4. Limpa alerta e chama o próximo
+    const container = document.querySelector('.alerta-proximo-cliente');
+    if (container) container.remove();
+
+    setTimeout(() => {
+        if (filaDeAlertas.length > 0) exibirProximoDaFila();
+    }, 1000);
+}
+
+// Função para o "X", caso ele não queira enviar para aquele cliente agora
+async function pularAlerta(id) {
+    filaDeAlertas.shift();
+    
+    // Marcamos como enviado mesmo no X para o barbeiro não ser "assombrado" pelo mesmo alerta
+    await _supabase.from('agendamentos').update({ lembrete_enviado: true }).eq('id', id);
+    
+    const container = document.querySelector('.alerta-proximo-cliente');
+    if (container) container.remove();
+    exibirProximoDaFila();
+}
+
+
+// Atualiza o sistema automaticamente a cada 5 minutos
+// Verifica atualizações a cada 2 minutos (120000ms)
+setInterval(() => {
+    if (typeof barbeiroLogadoId !== 'undefined' && barbeiroLogadoId) {
+        listarAgendaClientes();
+        if (document.getElementById('corpoTabela')) {
+            listarHorarios();
+        }
+    }
+}, 120000);
