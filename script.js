@@ -147,10 +147,9 @@ async function executarLogin() {
         if (error) throw error;
 
         // 2. BUSCA O STATUS DO BARBEIRO NO BANCO (A "BLINDAGEM")
-        // Verificamos se ele está ativo antes de permitir o acesso ao painel
         const { data: perfil, error: perfilError } = await _supabase
             .from('barbeiros')
-            .select('ativo')
+            .select('id, ativo') // Buscamos o ID e o status
             .eq('id', data.user.id)
             .single();
 
@@ -158,10 +157,17 @@ async function executarLogin() {
 
         // 3. VERIFICAÇÃO DE BLOQUEIO
         if (perfil && perfil.ativo === false) {
-            // Se estiver desativado, fazemos o logout imediato da sessão que acabou de abrir
             await _supabase.auth.signOut();
             throw new Error("Sua conta está desativada. Entre em contato com o administrador.");
         }
+
+        // --- NOVIDADE AQUI: PERSISTÊNCIA DE DADOS ---
+        // Salvamos o ID no navegador para que a página de finanças saiba quem você é
+        if (data.user) {
+            localStorage.setItem('barbeiroId', data.user.id);
+            localStorage.setItem('barbeiroEmail', data.user.email);
+        }
+        // --------------------------------------------
 
         // 4. Sucesso: Se passou por tudo, recarrega para entrar
         window.location.reload();
@@ -169,7 +175,6 @@ async function executarLogin() {
     } catch (err) {
         console.error("Erro no login:", err.message);
         
-        // Mensagem personalizada caso seja bloqueio ou erro de senha
         const msgErro = err.message.includes("desativada") 
             ? err.message 
             : "❌ Usuário ou senha incorretos.";
@@ -365,7 +370,6 @@ async function listarAgendaClientes() {
 
         if (error) throw error;
 
-        // --- GATILHO DO ALERTA DE 1 HORA ---
         if (agendamentos && agendamentos.length > 0) {
             verificarProximosAtendimentos(agendamentos);
         }
@@ -420,19 +424,37 @@ async function listarAgendaClientes() {
 
                 <td style="padding: 12px 8px; vertical-align: middle;">
                     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                        ${linkChat ? `
-                            <button onclick="enviarLembreteDireto('${item.cliente_nome}', '${item.horario}', '${numeroLimpo}')" 
-                                style="background: #25D366; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" title="Enviar Lembrete">
-                                🔔 AVISAR
+                        
+                        ${item.status !== 'concluido' ? `
+                            <button onclick="concluirAtendimento('${item.id}')" 
+                                style="background: #2dce89; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                ✅ CONCLUIR
                             </button>
-                        ` : ''}
+                        ` : `
+                            <span style="color: #2dce89; font-weight: 800; font-size: 10px; background: #eafaf1; padding: 4px 8px; border-radius: 4px;">
+                                💰 PAGO
+                            </span>
+                        `}
+
+                        <button onclick="prepararEdicao('${item.id}')" 
+                            style="background: #5e72e4; color: white; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 12px;" title="Editar">
+                            ✏️
+                        </button>
+
+                        <button onclick="deletarAgendamento('${item.id}')" 
+                            style="background: #f5365c; color: white; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 12px;" title="Excluir">
+                            🗑️
+                        </button>
 
                         ${linkChat ? `
+                            <button onclick="enviarLembreteDireto('${item.cliente_nome}', '${item.horario}', '${numeroLimpo}')" 
+                                style="background: #25D366; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                🔔 AVISAR
+                            </button>
                             <a href="${linkChat}" target="_blank" style="text-decoration: none;">
-                                <div style="background: #f0f0f0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 14px; border: 1px solid #ddd;">
-                                    💬
-                                </div>
-                            </a>` : '<span style="color:#ccc; font-size:10px;">-</span>'}
+                                <div style="background: #f0f0f0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 14px; border: 1px solid #ddd;">💬</div>
+                            </a>
+                        ` : ''}
                         
                         <label style="background: #f0f0f0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: pointer; font-size: 14px; border: 1px solid #ddd;" title="Adicionar Foto">
                             📷
@@ -450,14 +472,64 @@ async function listarAgendaClientes() {
     }
 }
 
-async function concluirAtendimento(id) {
-    const { error } = await _supabase.from('agendamentos').update({ status: 'concluido' }).eq('id', id);
-    if (!error) {
-        exibirStatus("✅ Atendimento concluído!");
-        listarAgendaClientes();
+async function concluirAtendimento(agendamentoId) {
+    if (!confirm("Confirmar conclusão e faturamento?")) return;
+
+    try {
+        // 1. Buscamos o agendamento. 
+        // Tentamos trazer os dados do serviço (nome e preco)
+        const { data: agendamento, error: fetchError } = await _supabase
+            .from('agendamentos')
+            .select(`
+                *,
+                servicos ( nome, preco )
+            `)
+            .eq('id', agendamentoId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        // 2. LÓGICA DE RESGATE DO PREÇO (CASCATA)
+        let valorFinal = 0;
+        let nomeDoServico = "Serviço";
+
+        if (agendamento.servicos) {
+            // Caminho A: Pegou da tabela servicos vinculada
+            valorFinal = parseFloat(agendamento.servicos.preco) || 0;
+            nomeDoServico = agendamento.servicos.nome || agendamento.servico;
+        } else {
+            // Caminho B: Se a relação falhou, tenta usar o que já estiver no agendamento
+            valorFinal = parseFloat(agendamento.valor) || parseFloat(agendamento.preco_final) || 0;
+            nomeDoServico = agendamento.servico || "Serviço";
+        }
+
+        // 3. GRAVAÇÃO NO BANCO
+        const { error: updateError } = await _supabase
+            .from('agendamentos')
+            .update({ 
+                status: 'concluido',
+                preco_final: valorFinal, // Aqui salva o número real
+                servico: nomeDoServico   // Garante que o nome seja salvo para o relatório
+            })
+            .eq('id', agendamentoId);
+
+        if (updateError) throw updateError;
+
+        // Feedback para você saber se funcionou
+        if (valorFinal === 0) {
+            console.warn("Atenção: Valor gravado como 0. Verifique se o serviço tem preço cadastrado.");
+        }
+
+        alert(`✅ Concluído! R$ ${valorFinal.toFixed(2)} registrado.`);
+        
+        await listarAgendaClientes();
+        if (typeof carregarRelatorioFaturamento === "function") carregarRelatorioFaturamento();
+
+    } catch (err) {
+        console.error("Erro ao concluir:", err);
+        alert("Erro técnico ao salvar. Verifique o console.");
     }
 }
-
 // ==========================================
 // TELA 3: GESTÃO DE SERVIÇOS
 // ==========================================
@@ -1593,3 +1665,340 @@ setInterval(() => {
         }
     }
 }, 120000);
+
+
+renderizarTabelaFinanceira
+
+async function carregarRelatorioFaturamento() {
+    const dataInicio = document.getElementById('fin-data-inicio').value;
+    const dataFim = document.getElementById('fin-data-fim').value;
+
+    if (!dataInicio || !dataFim) return;
+
+    try {
+        // Log para conferir o que está sendo enviado
+        console.log(`Buscando de ${dataInicio} até ${dataFim} para o Barbeiro: ${barbeiroLogadoId}`);
+
+        const { data: relatorio, error } = await _supabase
+            .from('agendamentos')
+            .select('id, servico, preco_final, status, data') 
+            .eq('barbeiro_id', barbeiroLogadoId)
+            .eq('status', 'concluido')
+            .gte('data', dataInicio) 
+            .lte('data', dataFim);
+
+        if (error) throw error;
+
+        console.log("Linhas encontradas:", relatorio);
+
+        let faturamentoTotal = 0;
+        let resumoServicos = {};
+
+        relatorio.forEach(item => {
+            const valor = Number(item.preco_final) || 0;
+            const nomeServico = item.servico || 'Serviço s/ Nome';
+
+            faturamentoTotal += valor;
+
+            if (!resumoServicos[nomeServico]) {
+                resumoServicos[nomeServico] = { qtd: 0, subtotal: 0 };
+            }
+            resumoServicos[nomeServico].qtd++;
+            resumoServicos[nomeServico].subtotal += valor;
+        });
+
+        // --- CÁLCULO DOS INDICADORES ---
+        const qtdAtendimentos = relatorio.length;
+        const ticketMedio = qtdAtendimentos > 0 ? (faturamentoTotal / qtdAtendimentos) : 0;
+
+        // --- ATUALIZAÇÃO DA INTERFACE ---
+        
+        // 1. Faturamento Total
+        const elTotal = document.getElementById('fin-total');
+        if (elTotal) {
+            elTotal.innerHTML = `<b>${faturamentoTotal.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})}</b>`;
+        }
+
+        // 2. Quantidade Total
+        const elQtd = document.getElementById('fin-qtd');
+        if (elQtd) elQtd.innerText = qtdAtendimentos;
+
+        // 3. Ticket Médio (NOVO)
+        const elTicket = document.getElementById('fin-ticket-medio');
+        if (elTicket) {
+            elTicket.innerHTML = `<b>${ticketMedio.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})}</b>`;
+        }
+
+        renderizarTabelaFinanceira(resumoServicos);
+
+    } catch (err) {
+        console.error("Erro técnico no faturamento:", err);
+    }
+}
+
+// Função auxiliar para desenhar a tabela na tela
+function renderizarTabelaFinanceira(dadosAgrupados) {
+    const container = document.getElementById('containerTabelaServicos');
+    if (!container) return;
+
+    let html = `
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead style="background: #f8f9fa; text-align: left;">
+                <tr>
+                    <th style="padding: 12px; font-size: 12px; color: #666;">SERVIÇO</th>
+                    <th style="padding: 12px; font-size: 12px; color: #666;">QTD</th>
+                    <th style="padding: 12px; font-size: 12px; color: #666;">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    const itens = Object.entries(dadosAgrupados);
+
+    if (itens.length === 0) {
+        html += '<tr><td colspan="3" style="text-align:center; padding:20px;">Nenhum serviço concluído.</td></tr>';
+    } else {
+        itens.forEach(([nome, info]) => {
+            html += `
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 12px; font-weight: bold;">${nome}</td>
+                    <td style="padding: 12px;">${info.qtd}</td>
+                    <td style="padding: 12px; color: #2dce89; font-weight: bold;">
+                        ${info.subtotal.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})}
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+}
+
+function mostrarTelaFinanceiro() {
+    console.log("Tentando abrir tela financeira...");
+
+    // Tenta encontrar a div
+    const telaFin = document.getElementById('tela-financeiro');
+
+    if (!telaFin) {
+        console.error("Erro: A div 'tela-financeiro' não existe no DOM.");
+        alert("Erro técnico: O sistema não encontrou a tela de faturamento no HTML.");
+        return;
+    }
+
+    // Esconde a agenda e outros elementos
+    const esconder = ['secao-agenda', 'form-container', 'btnAbrirForm', 'container-filtros-adm'];
+    esconder.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
+    // Exibe o financeiro com um pequeno delay para garantir o render
+    setTimeout(() => {
+        telaFin.style.display = 'block';
+        window.scrollTo(0, 0);
+        
+        // Configura datas e carrega dados
+        const campoInicio = document.getElementById('fin-data-inicio');
+        if (campoInicio && !campoInicio.value) {
+            const hoje = new Date();
+            document.getElementById('fin-data-inicio').value = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+            document.getElementById('fin-data-fim').value = hoje.toISOString().split('T')[0];
+        }
+        
+        gerarRelatorioFinanceiro();
+    }, 10);
+}
+
+// Função para voltar para a agenda
+function voltarParaAgenda() {
+    // Esconde o financeiro
+    const telaFin = document.getElementById('tela-financeiro');
+    if (telaFin) telaFin.style.display = 'none';
+
+    // Mostra a agenda e o botão de criar
+    if (document.getElementById('secao-agenda')) document.getElementById('secao-agenda').style.display = 'block';
+    if (document.getElementById('btnAbrirForm')) document.getElementById('btnAbrirForm').style.display = 'block';
+    if (document.getElementById('container-filtros-adm')) document.getElementById('container-filtros-adm').style.display = 'flex';
+}
+
+async function gerarRelatorioFinanceiro() {
+    console.log("Iniciando geração de relatório...");
+
+    // 1. Tenta recuperar o ID do barbeiro (Verificação Dupla)
+    let barbeiroId = localStorage.getItem('barbeiroId');
+
+    // Se o localStorage falhar, tenta recuperar da sessão ativa do Supabase
+    if (!barbeiroId || barbeiroId === "null" || barbeiroId === "undefined") {
+        const { data: sessionData } = await _supabase.auth.getSession();
+        if (sessionData?.session?.user) {
+            barbeiroId = sessionData.session.user.id;
+            localStorage.setItem('barbeiroId', barbeiroId); // Recupera e salva para a próxima
+        }
+    }
+
+    // Se mesmo assim não achar, bloqueia
+    if (!barbeiroId) {
+        console.error("Erro: ID do barbeiro não encontrado.");
+        document.getElementById('container-tabela-fin').innerHTML = 
+            '<div style="text-align:center; padding:20px;">' +
+            '<p style="color:#e74c3c; font-weight:bold;">⚠️ Sessão não identificada.</p>' +
+            '<p style="font-size:13px; color:#666;">Por favor, faça login novamente na agenda.</p>' +
+            '</div>';
+        return;
+    }
+
+    const dataInicio = document.getElementById('fin-data-inicio').value;
+    const dataFim = document.getElementById('fin-data-fim').value;
+
+    if (!dataInicio || !dataFim) return;
+
+    // Sinaliza carregamento
+    document.getElementById('container-tabela-fin').innerHTML = '<p style="text-align:center; padding:20px;">⏳ Processando dados...</p>';
+
+    try {
+        // 2. Busca agendamentos CONCLUÍDOS
+        const { data: resultados, error } = await _supabase
+            .from('agendamentos')
+            .select(`
+                *,
+                servicos:servico_id ( nome, preco )
+            `)
+            .eq('barbeiro_id', barbeiroId)
+            .eq('status', 'concluido')
+            .gte('data', dataInicio)
+            .lte('data', dataFim);
+
+        if (error) throw error;
+
+        // 3. Lógica de Cálculos
+        let faturamentoTotal = 0;
+        let totalAtendimentos = resultados ? resultados.length : 0;
+        let resumoServicos = {}; 
+
+        resultados.forEach(item => {
+            const valorSrv = item.servicos?.preco || item.valor || 0;
+            faturamentoTotal += parseFloat(valorSrv);
+
+            const nomeSrv = item.servicos?.nome || "Serviço s/ Nome";
+            if (!resumoServicos[nomeSrv]) {
+                resumoServicos[nomeSrv] = { qtd: 0, total: 0 };
+            }
+            resumoServicos[nomeSrv].qtd++;
+            resumoServicos[nomeSrv].total += parseFloat(valorSrv);
+        });
+
+        const ticketMedio = totalAtendimentos > 0 ? (faturamentoTotal / totalAtendimentos) : 0;
+
+        // 4. Atualiza os Cards
+        document.getElementById('fin-total-valor').innerText = faturamentoTotal.toLocaleString('pt-br', { style: 'currency', currency: 'BRL' });
+        document.getElementById('fin-total-qtd').innerText = totalAtendimentos;
+        document.getElementById('fin-ticket-medio').innerText = ticketMedio.toLocaleString('pt-br', { style: 'currency', currency: 'BRL' });
+
+        // 5. Monta a Tabela
+        if (totalAtendimentos === 0) {
+            document.getElementById('container-tabela-fin').innerHTML = '<p style="text-align:center; color:#888; padding:20px;">Nenhum faturamento registrado neste período.</p>';
+        } else {
+            let htmlTabela = `
+                <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <thead>
+                        <tr style="text-align: left; border-bottom: 2px solid #eee; color: #888; font-size: 11px;">
+                            <th style="padding: 12px;">SERVIÇO</th>
+                            <th style="padding: 12px;">QTD</th>
+                            <th style="padding: 12px;">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            for (const srv in resumoServicos) {
+                htmlTabela += `
+                    <tr style="border-bottom: 1px solid #f2f2f2; font-size: 14px; color: #2c3e50;">
+                        <td style="padding: 12px; font-weight: 600;">${srv}</td>
+                        <td style="padding: 12px;">${resumoServicos[srv].qtd}x</td>
+                        <td style="padding: 12px; font-weight: 600;">${resumoServicos[srv].total.toLocaleString('pt-br', { style: 'currency', currency: 'BRL' })}</td>
+                    </tr>
+                `;
+            }
+
+            htmlTabela += `</tbody></table>`;
+            document.getElementById('container-tabela-fin').innerHTML = htmlTabela;
+        }
+
+    } catch (err) {
+        console.error("Erro no processamento:", err);
+        document.getElementById('container-tabela-fin').innerHTML = '<p style="color:red; text-align:center; padding:20px;">Falha ao conectar com o banco de dados.</p>';
+    }
+}
+function renderizarTabelaDetalhada(dados) {
+    const container = document.getElementById('container-tabela-fin');
+    
+    if (Object.keys(dados).length === 0) {
+        container.innerHTML = '<p style="padding:30px; text-align:center; color:#888;">Nenhum faturamento encontrado neste período.</p>';
+        return;
+    }
+
+    let html = `
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead style="background: #fcfcfd; text-align: left; font-size: 12px; color: #888;">
+                <tr>
+                    <th style="padding: 15px;">SERVIÇO</th>
+                    <th style="padding: 15px;">QTD</th>
+                    <th style="padding: 15px;">TOTAL BRUTO</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    Object.entries(dados).forEach(([nome, info]) => {
+        html += `
+            <tr style="border-bottom: 1px solid #f8f9fe;">
+                <td style="padding: 15px; font-weight: 600; color:#333;">${nome}</td>
+                <td style="padding: 15px;">${info.qtd}</td>
+                <td style="padding: 15px; font-weight: bold; color: #2dce89;">${info.subtotal.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})}</td>
+            </tr>
+        `;
+    });
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+}
+
+
+
+function configurarDatasPadrao() {
+    const agora = new Date();
+    const primeiroDia = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0];
+    const ultimoDia = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).toISOString().split('T')[0];
+    
+    if(document.getElementById('fin-data-inicio')) document.getElementById('fin-data-inicio').value = primeiroDia;
+    if(document.getElementById('fin-data-fim')) document.getElementById('fin-data-fim').value = ultimoDia;
+}
+
+
+// Função para ser chamada exclusivamente pela página Financeiro
+function inicializarFinanceiro() {
+    // 1. Recupera o Barbeiro do LocalStorage
+    barbeiroLogadoId = localStorage.getItem('barbeiro_id') || localStorage.getItem('barbeiroId');
+    
+    if (!barbeiroLogadoId) {
+        alert("Sessão expirada. Por favor, faça login novamente.");
+        window.location.href = 'index.html';
+        return;
+    }
+
+    // 2. Configura as datas padrão (Início do mês até hoje)
+    const hoje = new Date();
+    const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+    const dataHoje = hoje.toISOString().split('T')[0];
+
+    const inputInicio = document.getElementById('fin-data-inicio');
+    const inputFim = document.getElementById('fin-data-fim');
+
+    if (inputInicio) inputInicio.value = primeiroDia;
+    if (inputFim) inputFim.value = dataHoje;
+
+    // 3. Carrega os dados pela primeira vez
+    carregarRelatorioFaturamento();
+}
