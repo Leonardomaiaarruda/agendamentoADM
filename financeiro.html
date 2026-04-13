@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financeiro - Barbearia</title>
+</head>
+<body style="margin: 0; font-family: sans-serif; background: #f8f9fe;">
+
+    <div id="tela-financeiro" style="padding: 20px; min-height: 100vh;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button onclick="window.location.href='index.html'" style="background: #eee; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; color: #333;">
+                    ← Voltar
+                </button>
+                <h1 style="color: #1a1c1e; font-size: 24px; font-weight: 800; margin: 0;">💰 Centro Financeiro</h1>
+            </div>
+            <button onclick="window.print()" style="background: white; border: 1px solid #ddd; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                🖨️ Exportar PDF
+            </button>
+        </div>
+
+        <div style="background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 25px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 12px; font-weight: bold; color: #888; display: block; margin-bottom: 5px;">DATA INICIAL</label>
+                <input type="date" id="fin-data-inicio" style="width: 100%; padding: 12px; border: 1px solid #eee; border-radius: 8px; font-family: inherit;">
+            </div>
+            <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 12px; font-weight: bold; color: #888; display: block; margin-bottom: 5px;">DATA FINAL</label>
+                <input type="date" id="fin-data-fim" style="width: 100%; padding: 12px; border: 1px solid #eee; border-radius: 8px; font-family: inherit;">
+            </div>
+            <button onclick="carregarRelatorioFaturamento()" style="background: #1a1c1e; color: white; border: none; padding: 14px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; flex: 0.5; min-width: 150px;">
+                ATUALIZAR DASHBOARD
+            </button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px;">
+            <div style="background: linear-gradient(135deg, #2dce89 0%, #2dcecc 100%); padding: 25px; border-radius: 15px; color: white; box-shadow: 0 10px 20px rgba(45, 206, 137, 0.2);">
+                <span style="font-size: 13px; font-weight: 600; text-transform: uppercase; opacity: 0.9;">Faturamento Bruto</span>
+                <div id="fin-total" style="font-size: 32px; font-weight: 800; margin-top: 10px;">R$ 0,00</div>
+            </div>
+
+            <div style="background: white; padding: 25px; border-radius: 15px; border: 1px solid #eee;">
+                <span style="color: #888; font-size: 13px; font-weight: 600; text-transform: uppercase;">Atendimentos Concluídos</span>
+                <div id="fin-qtd" style="font-size: 32px; font-weight: 800; color: #1a1c1e; margin-top: 10px;">0</div>
+            </div>
+
+            <div style="background: white; padding: 25px; border-radius: 15px; border: 1px solid #eee;">
+                <span style="color: #888; font-size: 13px; font-weight: 600; text-transform: uppercase;">Ticket Médio</span>
+                <div id="fin-ticket-medio" style="font-size: 32px; font-weight: 800; color: #5e72e4; margin-top: 10px;">R$ 0,00</div>
+            </div>
+        </div>
+
+        <div style="background: white; margin-top: 30px; border-radius: 15px; border: 1px solid #eee; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+            <div style="padding: 20px; border-bottom: 1px solid #eee; font-weight: bold; color: #333; background: #fafafa;">
+                📊 Desempenho por Serviço
+            </div>
+            <div id="containerTabelaServicos" style="padding: 10px; min-height: 100px;">
+                <p style="text-align: center; color: #999; padding: 20px;">Selecione um período para carregar os dados...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="script.js"></script>
+
+    <script>
+        // Inicialização Segura
+        document.addEventListener('DOMContentLoaded', () => {
+            // Verifica se a função de inicialização existe no script.js
+            if (typeof inicializarFinanceiro === "function") {
+                inicializarFinanceiro();
+            } else {
+                // Caso não tenha a função, apenas configura as datas
+                const hoje = new Date().toISOString().split('T')[0];
+                document.getElementById('fin-data-inicio').value = hoje;
+                document.getElementById('fin-data-fim').value = hoje;
+            }
+        });
+    </script>
+</body>
+</html>
