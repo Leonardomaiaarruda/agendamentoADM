@@ -662,6 +662,23 @@ async function salvarServicosNoGoogle() {
     } catch (e) { exibirStatus("❌ Erro ao salvar."); }
 }
 
+async function deletarAgendamento(id) {
+    if (!confirm("Tem certeza que deseja excluir este agendamento?")) return;
+
+    try {
+        const { error } = await _supabase
+            .from('agendamentos') // Tabela de compromissos
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+        listarAgendaClientes(); // Recarrega a lista de clientes
+        exibirStatus("🗑️ Agendamento removido!");
+    } catch (err) {
+        console.error("Erro ao deletar:", err);
+    }
+}
+
 // ==========================================
 // LÓGICA DO FORMULÁRIO (GERAR / EDITAR)
 // ==========================================
@@ -670,26 +687,109 @@ function toggleFormulario() {
     if (formContainer.classList.contains('hidden')) {
         formContainer.classList.remove('hidden');
         btnAbrirForm.textContent = "✖️ Fechar";
+        
+        // Se NÃO estivermos editando, garantimos que o formulário apareça no modo "Gerar Vagas"
+        if (!idSendoEditado) {
+            document.getElementById('titulo-form').textContent = "Configurar Grade de Horários";
+            document.getElementById('btnSalvar').textContent = "Gerar Horários";
+            document.getElementById('campos-edicao-cliente').classList.add('hidden');
+            
+            // Reexibe os campos de geração em massa que a edição esconde
+            exibirCamposMassa(true);
+        }
     } else {
         fecharELimparFormulario();
     }
 }
 
+// Função auxiliar para limpar tudo ao fechar
 function fecharELimparFormulario() {
-    idSendoEditado = null; 
-    form.reset();
     formContainer.classList.add('hidden');
-    btnAbrirForm.textContent = "➕ Criar Vagas";
-    btnSalvar.textContent = "Gerar Horários";
+    btnAbrirForm.textContent = "➕ Gerar Horários";
+    
+    // Reseta o estado de edição
+    idSendoEditado = null;
+    
+    // Limpa os campos de texto
+    document.getElementById('scheduleForm').reset();
+    
+    // Volta o título e botão ao padrão
+    document.getElementById('titulo-form').textContent = "Configurar Grade de Horários";
+    document.getElementById('btnSalvar').textContent = "Gerar Horários";
+    document.getElementById('btnSalvar').style.background = ""; // Volta cor original do CSS
+    
+    // Garante que os campos de cliente sumam
+    document.getElementById('campos-edicao-cliente').classList.add('hidden');
+    
+    // Mostra os campos de massa novamente para a próxima vez
+    exibirCamposMassa(true);
 }
 
-function prepararEdicao(item) {
-    idSendoEditado = item.id;
-    if (formContainer.classList.contains('hidden')) toggleFormulario();
-    document.getElementById('dataInicio').value = item.data;
-    document.getElementById('horaInicio').value = item.horario.substring(0,5);
-    document.getElementById('servico').value = item.servico || "";
-    btnSalvar.textContent = "Atualizar Horário";
+// Função para mostrar/esconder campos de geração em massa
+function exibirCamposMassa(exibir) {
+    const display = exibir ? 'block' : 'none';
+    const campos = [
+        'container-data-fim',
+        'container-dias-semana',
+        'container-intervalo',
+        'container-hora-fim'
+    ];
+    
+    campos.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = display;
+    });
+}
+
+
+async function prepararEdicao(id) {
+    console.log("Editando ID:", id); // Log para você ver no console se o clique funcionou
+    idSendoEditado = id;
+
+    try {
+        const { data: item, error } = await _supabase
+            .from('agendamentos')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+
+        // 1. Muda para a tela onde está o formulário
+        mudarTela('gerar');
+
+        // 2. Garante que o formulário e os campos de cliente apareçam
+        formContainer.classList.remove('hidden');
+        document.getElementById('campos-edicao-cliente').classList.remove('hidden');
+        btnAbrirForm.textContent = "✖️ Cancelar Edição";
+
+        // 3. Preenche os campos (usando os IDs que estão no seu HTML)
+        const nome = document.getElementById('cliente_nome');
+        const whats = document.getElementById('cliente_whatsapp');
+        const serv = document.getElementById('servico');
+        const data = document.getElementById('dataInicio');
+        const hora = document.getElementById('horaInicio');
+
+        if (nome) nome.value = item.cliente_nome || "";
+        if (whats) whats.value = item.cliente_whatsapp || "";
+        if (serv) serv.value = item.servico || "";
+        if (data) data.value = item.data || "";
+        if (hora) hora.value = item.horario ? item.horario.substring(0, 5) : "";
+
+        // 4. Esconde campos de geração em massa para não confundir
+        exibirCamposMassa(false);
+
+        // 5. Muda o botão de ação
+        const btnSalvar = document.getElementById('btnSalvar');
+        btnSalvar.innerHTML = "💾 SALVAR ALTERAÇÕES";
+        btnSalvar.style.background = "#2dce89";
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    } catch (err) {
+        console.error("Erro ao carregar dados:", err);
+        alert("Não foi possível carregar os dados para edição.");
+    }
 }
 
 if (form) {
@@ -1931,6 +2031,7 @@ async function gerarRelatorioFinanceiro() {
         document.getElementById('container-tabela-fin').innerHTML = '<p style="color:red; text-align:center; padding:20px;">Falha ao conectar com o banco de dados.</p>';
     }
 }
+
 function renderizarTabelaDetalhada(dados) {
     const container = document.getElementById('container-tabela-fin');
     
@@ -1964,8 +2065,6 @@ function renderizarTabelaDetalhada(dados) {
     html += `</tbody></table>`;
     container.innerHTML = html;
 }
-
-
 
 function configurarDatasPadrao() {
     const agora = new Date();
