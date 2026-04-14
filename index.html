@@ -51,7 +51,7 @@
             <nav class="admin-nav">
                 <button onclick="mudarTela('gerar')" id="btn-nav-gerar-desk" class="nav-btn active">🛠️ Vagas</button>
                 <button onclick="mudarTela('agenda')" id="btn-nav-agenda-desk" class="nav-btn">📅 Agenda</button>
-               <button onclick="window.location.href='financeiro.html'"  style="color: #14ae09; margin-left: 10px;"> 💰 Financeiro </button>
+                <button onclick="window.location.href='financeiro.html'" style="color: #14ae09; margin-left: 10px;"> 💰 Financeiro </button>
                 <button onclick="abrirModalConfig()" class="nav-btn">✂️ Serviços</button>
                 <button onclick="abrirModalBarbeiros()" id="btn-nav-equipe-desk" class="nav-btn" style="display: none;">👥 Equipe</button>
                 <button onclick="fazerLogout()" class="nav-btn" style="color: #f5365c; margin-left: 10px;">🚪 Sair</button>
@@ -65,6 +65,11 @@
             <button onclick="mudarTela('agenda')" id="btn-nav-agenda" class="nav-mobile-item">
                 <i>📅</i> <span>Agenda</span>
             </button>
+            
+            <button onclick="window.location.href='financeiro.html'" class="nav-mobile-item" style="color: #14ae09;">
+                <i>💰</i> <span>Financeiro</span>
+            </button>
+            
             <button onclick="abrirModalConfig()" class="nav-mobile-item">
                 <i>✂️</i> <span>Serviços</span>
             </button>
@@ -88,17 +93,30 @@
             <section id="form-container" class="card hidden anim-up" style="margin-bottom: 20px;">
                 <h2 id="titulo-form">Configurar Grade de Horários</h2>
                 <form id="scheduleForm">
+                    
+                    <div id="campos-edicao-cliente" class="hidden">
+                        <div class="form-group">
+                            <label>Nome do Cliente</label>
+                            <input type="text" id="cliente_nome" class="input-field" placeholder="Ex: João Silva">
+                        </div>
+                        <div class="form-group">
+                            <label>WhatsApp</label>
+                            <input type="text" id="cliente_whatsapp" class="input-field" placeholder="Ex: 16999999999">
+                        </div>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label>Data Início</label>
                             <input type="date" id="dataInicio" required>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group" id="container-data-fim">
                             <label>Data Fim</label>
-                            <input type="date" id="dataFim" required>
+                            <input type="date" id="dataFim">
                         </div>
                     </div>
-                    <div class="form-group">
+
+                    <div id="container-dias-semana" class="form-group">
                         <label>Dias da Semana</label>
                         <div class="dias-check-group">
                             <label class="check-item"><input type="checkbox" name="dia_sem" value="1" checked> Seg</label>
@@ -110,18 +128,20 @@
                             <label class="check-item"><input type="checkbox" name="dia_sem" value="0"> Dom</label>
                         </div>
                     </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label>Hora Início</label>
                             <input type="time" id="horaInicio" value="08:00" required>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group" id="container-hora-fim">
                             <label>Hora Fim</label>
-                            <input type="time" id="horaFim" value="19:00" required>
+                            <input type="time" id="horaFim" value="19:00">
                         </div>
                     </div>
+
                     <div class="form-row">
-                        <div class="form-group">
+                        <div class="form-group" id="container-intervalo">
                             <label>Intervalo (min)</label>
                             <select id="intervalo">
                                 <option value="30">30 min</option>
@@ -131,7 +151,7 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Serviço Fixo (opcional)</label>
+                            <label>Serviço</label>
                             <select id="servico"></select>
                         </div>
                     </div>
@@ -165,8 +185,7 @@
                             <th style="text-align: right; padding: 12px;">Ações</th>
                         </tr>
                     </thead>
-                    <tbody id="corpoTabela">
-                        </tbody>
+                    <tbody id="corpoTabela"></tbody>
                 </table>
             </div>
         </main>
@@ -181,7 +200,6 @@
                                 <th>Data/Hora</th>
                                 <th>Cliente</th>
                                 <th>Serviço</th>
-                                <th>Contato</th>
                                 <th style="text-align: right;">Ação</th>
                             </tr>
                         </thead>
@@ -216,21 +234,16 @@
                 <h2>👥 Gestão da Equipe</h2>
                 <button onclick="fecharModalBarbeiros()" class="btn-close">×</button>
             </div>
-            
             <div id="formCadastroBarbeiro" class="form-group" style="padding: 15px; background: #f0f7ff; border-radius: 12px; margin-bottom: 20px;">
                 <label>Nome Completo</label>
                 <input type="text" id="novoBarbeiroNome" placeholder="Ex: João Silva">
-                
                 <label style="margin-top:10px; display:block;">E-mail de Login</label>
                 <input type="email" id="novoBarbeiroEmail" placeholder="barbeiro@email.com">
-                
                 <label style="margin-top:10px; display:block;">Senha Inicial</label>
                 <input type="password" id="novoBarbeiroSenha" placeholder="Mínimo 6 caracteres">
-
                 <button onclick="realizarCadastroCompleto()" id="btnCadastrarEquipe" class="btn-primario" style="margin-top: 15px; width: 100%;">Registrar e Criar Acesso</button>
                 <p id="statusCadastro" style="font-size: 11px; text-align: center; margin-top: 8px; display: none;"></p>
             </div>
-
             <h3 style="font-size: 1rem; margin-bottom: 10px;">Barbeiros Ativos</h3>
             <ul id="listaBarbeirosConfig" style="max-height: 250px; overflow-y: auto; list-style: none; padding: 0;"></ul>
         </div>
@@ -240,13 +253,10 @@
         <div class="modal-content-centered">
             <button onclick="fecharModalSenha()" class="btn-close-modal">&times;</button>
             <h3 style="margin-bottom: 20px; text-align: center;">🔐 Alterar Senha</h3>
-            
             <label style="font-size: 0.85rem; font-weight: 600;">Nova Senha</label>
             <input type="password" id="novaSenhaInput" class="input-field" placeholder="Mínimo 6 caracteres" style="width: 100%; margin-bottom: 15px;">
-            
             <label style="font-size: 0.85rem; font-weight: 600;">Confirmar Nova Senha</label>
             <input type="password" id="confirmarSenhaInput" class="input-field" placeholder="Repita a senha" style="width: 100%; margin-bottom: 20px;">
-            
             <button onclick="executarTrocaSenha()" id="btnConfirmarSenha" class="btn-primario" style="width: 100%;">Atualizar Senha</button>
             <p id="statusSenha" style="font-size: 12px; text-align: center; margin-top: 15px; display: none;"></p>
         </div>
