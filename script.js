@@ -1,6 +1,4 @@
-// =========================================
-// CONFIGURAÇÕES GLOBAIS - SUPABASE
-// =========================================
+
 const SUPABASE_URL = "https://ddqqtzwaxsgkbrnfjikv.supabase.co"; 
 const SUPABASE_KEY = "sb_publishable__-43znJ2AImyNshY5nsTvA_Q5JUvFUV"; 
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -8,7 +6,6 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const BARBEARIA_ID = "817597d5-9a4b-4c6a-ab3b-9969a2d3999d";
 const UUID_DONO = "432083b6-5a4a-4d0a-ae1b-0abec9f8195e";
 
-// Elementos da Interface
 const form = document.getElementById('scheduleForm');
 const formContainer = document.getElementById('form-container');
 const btnAbrirForm = document.getElementById('btnAbrirForm');
@@ -22,16 +19,8 @@ const selectServico = document.getElementById('servico');
 let idSendoEditado = null; 
 let listaServicosLocal = []; 
 
-// =========================================
-// 1. SISTEMA DE AUTENTICAÇÃO (BLINDAGEM)
-// =========================================
-
-/**
- * Verifica se existe uma sessão ativa. Se não houver, mantém a tela de login visível.
- */
 let barbeiroLogadoId = null;
 
-// Substitua pelo SEU e-mail de administrador
 const EMAIL_DONO = "leonardomaiaarruda@gmail.com"; 
 
 async function verificarAcesso() {
@@ -44,8 +33,6 @@ async function verificarAcesso() {
         const authUser = session.user;
         const emailUsuario = authUser.email;
         
-        // 1. Busca o barbeiro para pegar ID e FOTO_URL
-    // Note que agora usamos 'foto_url' (com hífen) para bater com o seu banco
         const { data: barbeiros, error: erroBusca } = await _supabase
             .from('barbeiros')
             .select('id, "foto_url"') 
@@ -54,38 +41,27 @@ async function verificarAcesso() {
             if (barbeiros && barbeiros.length > 0) {
                 const barbeiro = barbeiros[0];
                 
-                // 1. VÍNCULO DINÂMICO: Ignora IDs fixos e usa o ID real do banco
                 barbeiroLogadoId = barbeiro.id;
                 
-                // 2. PERSISTÊNCIA: Salva o ID real no navegador para o F5 (essencial para funcionários)
                 localStorage.setItem('barbeiro_id', barbeiro.id);
 
-                console.log("Login identificado para o ID:", barbeiroLogadoId);
 
                 const imgPerfil = document.getElementById('imgPerfil');
                 if (imgPerfil) {
-                    // 3. RECUPERAÇÃO DA FOTO: Usa o nome exato da coluna no Supabase ('foto_url')
                     const urlFoto = barbeiro['foto_url'];
 
                     if (urlFoto) {
-                        // O ?t= força o navegador a ignorar o cache e mostrar a foto nova
                         imgPerfil.src = `${urlFoto}?t=${Date.now()}`;
                     } else {
-                        // Fallback: Gera uma inicial colorida se o funcionário não tiver foto
                         const iniciais = emailUsuario.split('@')[0];
                         imgPerfil.src = `https://ui-avatars.com/api/?name=${iniciais}&background=random&color=fff`;
                     }
                 }
 
-                // 4. LIMPEZA DE SEGURANÇA (Opcional)
-                // Se você tiver uma variável chamada UUID_DONO sendo usada em outros lugares,
-                // certifique-se de que as funções de agendamento usem 'barbeiroLogadoId' daqui em diante.
                 if (typeof carregarAgenda === "function") {
                     carregarAgenda(); 
                 }
             } else {
-            // 2. Se não existe na tabela, faz o auto-vínculo usando UPSERT
-            console.log("Auto-vinculando novo barbeiro...");
             barbeiroLogadoId = authUser.id;
 
             const { error: errorAuto } = await _supabase
@@ -97,10 +73,8 @@ async function verificarAcesso() {
                     barbearia_id: BARBEARIA_ID 
                 }], { onConflict: 'id' });
             
-            if (errorAuto) console.error("Erro no vínculo:", errorAuto.message);
         }
 
-        // Regra do Botão de Equipe (Apenas para o seu e-mail)
         if (btnEquipe) {
             btnEquipe.style.display = (emailUsuario.toLowerCase() === "leonardomaiaarruda@gmail.com") ? "flex" : "none";
         }
@@ -113,16 +87,10 @@ async function verificarAcesso() {
     }
 }
 
-/** Executa o login com os dados inseridos na interface **/
 async function executarLogin() {
     const emailInput = document.getElementById('email');
     const senhaInput = document.getElementById('login-senha');
     const btnLogin = document.querySelector('#login-screen .btn-primario');
-
-    if (!emailInput || !senhaInput) {
-        console.error("IDs não encontrados: Verifique se os campos existem no HTML.");
-        return;
-    }
 
     const email = emailInput.value.trim();
     const senha = senhaInput.value.trim();
@@ -138,7 +106,6 @@ async function executarLogin() {
     }
 
     try {
-        // 1. Valida e-mail e senha no Supabase Auth
         const { data, error } = await _supabase.auth.signInWithPassword({
             email: email,
             password: senha
@@ -146,35 +113,27 @@ async function executarLogin() {
 
         if (error) throw error;
 
-        // 2. BUSCA O STATUS DO BARBEIRO NO BANCO (A "BLINDAGEM")
         const { data: perfil, error: perfilError } = await _supabase
             .from('barbeiros')
-            .select('id, ativo') // Buscamos o ID e o status
+            .select('id, ativo')
             .eq('id', data.user.id)
             .single();
 
         if (perfilError) throw new Error("Erro ao verificar perfil: " + perfilError.message);
 
-        // 3. VERIFICAÇÃO DE BLOQUEIO
         if (perfil && perfil.ativo === false) {
             await _supabase.auth.signOut();
             throw new Error("Sua conta está desativada. Entre em contato com o administrador.");
         }
 
-        // --- NOVIDADE AQUI: PERSISTÊNCIA DE DADOS ---
-        // Salvamos o ID no navegador para que a página de finanças saiba quem você é
         if (data.user) {
             localStorage.setItem('barbeiroId', data.user.id);
             localStorage.setItem('barbeiroEmail', data.user.email);
         }
-        // --------------------------------------------
 
-        // 4. Sucesso: Se passou por tudo, recarrega para entrar
         window.location.reload();
 
-    } catch (err) {
-        console.error("Erro no login:", err.message);
-        
+    } catch (err) {        
         const msgErro = err.message.includes("desativada") 
             ? err.message 
             : "❌ Usuário ou senha incorretos.";
@@ -188,32 +147,19 @@ async function executarLogin() {
     }
 }
 
-/**
- * Finaliza a sessão do administrador
- */
+
 async function fazerLogout() {
     try {
-        // 1. Desloga da sessão do Supabase (Auth)
         await _supabase.auth.signOut();
 
-        // 2. LIMPA O CACHE LOCAL (Essencial para a foto não "assombrar" o próximo login)
         localStorage.removeItem('barbeiro_id');
-        
-        // Opcional: Limpar tudo se você não quiser resquícios de outros dados
-        // localStorage.clear(); 
 
-        // 3. Recarrega a página para voltar à tela de login
         location.reload();
         
     } catch (error) {
-        console.error("Erro ao sair:", error);
-        // Mesmo com erro no signOut, forçamos o reload para segurança
         location.reload();
     }
 }
-// =========================================
-// 2. INICIALIZAÇÃO UNIFICADA
-// =========================================
 
 window.addEventListener('DOMContentLoaded', async () => {
     const logado = await verificarAcesso();
@@ -238,9 +184,6 @@ function configurarCalendario() {
     inputData.value = dataFormatada;
 }
 
-// ==========================================
-// NAVEGAÇÃO ENTRE TELAS
-// ==========================================
 
 function mudarTela(tela) {
     document.querySelectorAll('.tela-content').forEach(t => t.classList.add('hidden'));
@@ -249,7 +192,6 @@ function mudarTela(tela) {
 
     document.querySelectorAll('.nav-mobile-item, .nav-btn').forEach(btn => btn.classList.remove('active'));
     
-    // IDs de navegação desktop e mobile do seu index.html
     const btnMobile = document.getElementById(`btn-nav-${tela}`);
     if (btnMobile) btnMobile.classList.add('active');
     
@@ -271,10 +213,7 @@ async function listarHorarios() {
     
     if (!dataParaFiltrar) {
         const agora = new Date();
-        const ano = agora.getFullYear();
-        const mes = String(agora.getMonth() + 1).padStart(2, '0');
-        const dia = String(agora.getDate()).padStart(2, '0');
-        dataParaFiltrar = `${ano}-${mes}-${dia}`;
+        dataParaFiltrar = agora.toISOString().split('T')[0];
         if (filtroData) filtroData.value = dataParaFiltrar;
     }
 
@@ -290,44 +229,71 @@ async function listarHorarios() {
 
         if (error) throw error;
 
-        // --- GATILHO DE ALERTA ATIVADO PARA A TELA DE VAGAS ---
-        if (agendamentos && agendamentos.length > 0) {
-            verificarProximosAtendimentos(agendamentos);
-        }
+        if (agendamentos?.length > 0) verificarProximosAtendimentos(agendamentos);
 
         if (!agendamentos || agendamentos.length === 0) {
-            corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:40px; color:#888;">Nenhuma vaga para este dia.</td></tr>`;
+            corpoTabela.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:40px; color:#888;">Nenhuma vaga para este dia.</td></tr>';
             return;
         }
 
-        corpoTabela.innerHTML = '';
+        corpoTabela.innerHTML = ''; // Limpa o carregando...
 
         agendamentos.forEach(vaga => {
             const tr = document.createElement('tr');
             tr.style.borderBottom = "1px solid #eee";
             
-            const statusCor = vaga.status === 'disponivel' ? '#2dce89' : '#f5365c';
-            const statusTexto = vaga.status === 'disponivel' ? 'Livre' : (vaga.cliente_nome || 'Ocupado');
+            // Coluna 1: Horário
+            const tdHorario = document.createElement('td');
+            tdHorario.style.padding = "12px";
+            tdHorario.style.fontWeight = "700";
+            tdHorario.style.color = "#333";
+            tdHorario.textContent = vaga.horario.substring(0, 5);
 
-            tr.innerHTML = `
-                <td style="padding: 12px; font-weight: 700; color: #333;">
-                    ${vaga.horario.substring(0, 5)}
-                </td>
-                <td style="padding: 12px;">
-                    <div style="display: flex; flex-direction: column;">
-                        <span style="font-size: 11px; font-weight: 700; color: ${statusCor};">
-                            ● ${vaga.status === 'disponivel' ? 'DISPONÍVEL' : 'RESERVADO'}
-                        </span>
-                        <span style="font-size: 13px; color: #555;">
-                            ${vaga.status === 'disponivel' ? 'Vaga aberta' : statusTexto}
-                        </span>
-                    </div>
-                </td>
-                <td style="padding: 12px; text-align: right; white-space: nowrap;">
-                    <button onclick="editarVaga('${vaga.id}')" style="background: #f0f0f0; border: none; padding: 10px; border-radius: 8px; cursor: pointer; margin-right: 5px;">✏️</button>
-                    <button onclick="excluirVaga('${vaga.id}')" style="background: #fff0f0; border: none; padding: 10px; border-radius: 8px; cursor: pointer;">🗑️</button>
-                </td>
-            `;
+            // Coluna 2: Status e Informações (Blindada)
+            const tdInfo = document.createElement('td');
+            tdInfo.style.padding = "12px";
+            
+            const divInfo = document.createElement('div');
+            divInfo.style.display = "flex";
+            divInfo.style.flexDirection = "column";
+
+            const spanStatus = document.createElement('span');
+            spanStatus.style.fontSize = "11px";
+            spanStatus.style.fontWeight = "700";
+            spanStatus.style.color = vaga.status === 'disponivel' ? '#2dce89' : '#f5365c';
+            spanStatus.textContent = `● ${vaga.status === 'disponivel' ? 'DISPONÍVEL' : 'RESERVADO'}`;
+
+            const spanNome = document.createElement('span');
+            spanNome.style.fontSize = "13px";
+            spanNome.style.color = "#555";
+            spanNome.textContent = vaga.status === 'disponivel' ? 'Vaga aberta' : (vaga.cliente_nome || 'Ocupado');
+
+            divInfo.appendChild(spanStatus);
+            divInfo.appendChild(spanNome);
+            tdInfo.appendChild(divInfo);
+
+            // Coluna 3: Botões
+            const tdAcoes = document.createElement('td');
+            tdAcoes.style.padding = "12px";
+            tdAcoes.style.textAlign = "right";
+            tdAcoes.style.whiteSpace = "nowrap";
+
+            const btnEdit = document.createElement('button');
+            btnEdit.textContent = "✏️";
+            btnEdit.style.cssText = "background: #5e72e4; color: white; border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 5px;";
+            btnEdit.onclick = () => prepararEdicao(vaga.id);
+
+            const btnDel = document.createElement('button');
+            btnDel.textContent = "🗑️";
+            btnDel.style.cssText = "background: #fff0f0; border: none; padding: 10px; border-radius: 8px; cursor: pointer;";
+            btnDel.onclick = () => deletarVaga(vaga.id);
+
+            tdAcoes.appendChild(btnEdit);
+            tdAcoes.appendChild(btnDel);
+
+            tr.appendChild(tdHorario);
+            tr.appendChild(tdInfo);
+            tr.appendChild(tdAcoes);
             corpoTabela.appendChild(tr);
         });
 
@@ -335,35 +301,56 @@ async function listarHorarios() {
         if (statVagas) statVagas.innerText = agendamentos.length;
 
     } catch (err) {
-        console.error(err);
         corpoTabela.innerHTML = '<tr><td colspan="3" style="color:red; text-align:center;">Erro ao carregar.</td></tr>';
     }
 }
 
 async function deletarVaga(id) {
-    if (!confirm("Excluir esta vaga permanentemente?")) return;
-    exibirStatus("🗑️ Removendo...");
-    const { error } = await _supabase.from('agendamentos').delete().eq('id', id);
-    if (!error) {
-        exibirStatus("✅ Removido!");
-        listarHorarios();
+    if (!confirm("Deseja liberar este horário? Ele voltará a ficar disponível na agenda.")) return;
+        
+    try {
+        const { error } = await _supabase
+            .from('agendamentos')
+            .update({ 
+                status: 'disponivel', 
+                cliente_nome: null, 
+                cliente_whatsapp: null, 
+                servico: null,
+                preco_final: 0
+            })
+            .eq('id', id);
+
+        if (error) throw error;
+
+        // Sucesso
+        alert("✅ Horário liberado com sucesso!");
+        
+        await listarHorarios();
+        if (typeof listarAgendaClientes === 'function') await listarAgendaClientes();
+
+    } catch (err) {
+        alert("Erro ao tentar liberar o horário: " + err.message);
     }
 }
 
-// ==========================================
-// TELA 2: AGENDA DE CLIENTES (HISTÓRICO)
-// ==========================================
 async function listarAgendaClientes() {
+const idReal = await _supabase.auth.getUser();
+if (!idReal.data.user || idReal.data.user.id !== barbeiroLogadoId) {
+    window.location.href = 'index.html';
+}
+
     const corpoAgenda = document.getElementById('corpoAgenda');
     if (!corpoAgenda) return;
 
     corpoAgenda.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 25px; color: #666;">⌛ Carregando agenda...</td></tr>';
 
     try {
+        const idBarbeiro = barbeiroLogadoId || localStorage.getItem('barbeiro_id');
+        
         const { data: agendamentos, error } = await _supabase
             .from('agendamentos')
             .select('*')
-            .eq('barbeiro_id', barbeiroLogadoId)
+            .eq('barbeiro_id', idBarbeiro)
             .neq('status', 'disponivel') 
             .order('data', { ascending: true })
             .order('horario', { ascending: true });
@@ -371,7 +358,9 @@ async function listarAgendaClientes() {
         if (error) throw error;
 
         if (agendamentos && agendamentos.length > 0) {
-            verificarProximosAtendimentos(agendamentos);
+            if (typeof verificarProximosAtendimentos === 'function') {
+                verificarProximosAtendimentos(agendamentos);
+            }
         }
 
         if (!agendamentos || agendamentos.length === 0) {
@@ -394,10 +383,11 @@ async function listarAgendaClientes() {
             if (Array.isArray(item.foto_corte) && item.foto_corte.length > 0) {
                 const fotosValidas = item.foto_corte.filter(url => url && url !== "null");
                 if (fotosValidas.length > 0) {
-                    htmlFotos = `<div class="cliente-fotos-bloco">
+                    htmlFotos = `<div class="cliente-fotos-bloco" style="display: flex; gap: 4px; margin-top: 5px;">
                         ${fotosValidas.map(url => `
                             <img src="${url}" onclick="window.open('${url}', '_blank')" 
-                                 class="foto-corte-agendamento" title="Clique para ampliar">
+                                 class="foto-corte-agendamento" title="Clique para ampliar"
+                                 style="width: 30px; height: 30px; object-fit: cover; border-radius: 4px; cursor: pointer;">
                         `).join('')}
                     </div>`;
                 }
@@ -411,7 +401,7 @@ async function listarAgendaClientes() {
 
                 <td style="padding: 12px 8px; vertical-align: middle;">
                     <div class="celula-cliente-container">
-                        <div class="cliente-nome-tabela" style="font-weight: 600;">
+                        <div class="cliente-nome-tabela" style="font-weight: 600; color: #333;">
                             ${item.cliente_nome || 'Não informado'}
                         </div>
                         ${htmlFotos}
@@ -427,7 +417,7 @@ async function listarAgendaClientes() {
                         
                         ${item.status !== 'concluido' ? `
                             <button onclick="concluirAtendimento('${item.id}')" 
-                                style="background: #2dce89; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                style="background: #2dce89; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer;">
                                 ✅ CONCLUIR
                             </button>
                         ` : `
@@ -448,7 +438,7 @@ async function listarAgendaClientes() {
 
                         ${linkChat ? `
                             <button onclick="enviarLembreteDireto('${item.cliente_nome}', '${item.horario}', '${numeroLimpo}')" 
-                                style="background: #25D366; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                style="background: #25D366; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer;">
                                 🔔 AVISAR
                             </button>
                             <a href="${linkChat}" target="_blank" style="text-decoration: none;">
@@ -467,7 +457,6 @@ async function listarAgendaClientes() {
         });
 
     } catch (err) {
-        console.error("Erro na agenda:", err);
         corpoAgenda.innerHTML = '<tr><td colspan="4" style="color:red; text-align:center; padding: 20px;">Erro ao carregar dados.</td></tr>';
     }
 }
@@ -476,8 +465,6 @@ async function concluirAtendimento(agendamentoId) {
     if (!confirm("Confirmar conclusão e faturamento?")) return;
 
     try {
-        // 1. Buscamos o agendamento. 
-        // Tentamos trazer os dados do serviço (nome e preco)
         const { data: agendamento, error: fetchError } = await _supabase
             .from('agendamentos')
             .select(`
@@ -489,7 +476,6 @@ async function concluirAtendimento(agendamentoId) {
 
         if (fetchError) throw fetchError;
 
-        // 2. LÓGICA DE RESGATE DO PREÇO (CASCATA)
         let valorFinal = 0;
         let nomeDoServico = "Serviço";
 
@@ -503,22 +489,16 @@ async function concluirAtendimento(agendamentoId) {
             nomeDoServico = agendamento.servico || "Serviço";
         }
 
-        // 3. GRAVAÇÃO NO BANCO
         const { error: updateError } = await _supabase
             .from('agendamentos')
             .update({ 
                 status: 'concluido',
-                preco_final: valorFinal, // Aqui salva o número real
-                servico: nomeDoServico   // Garante que o nome seja salvo para o relatório
+                preco_final: valorFinal,
+                servico: nomeDoServico 
             })
             .eq('id', agendamentoId);
 
-        if (updateError) throw updateError;
-
-        // Feedback para você saber se funcionou
-        if (valorFinal === 0) {
-            console.warn("Atenção: Valor gravado como 0. Verifique se o serviço tem preço cadastrado.");
-        }
+        if (updateError) throw updateError;      
 
         alert(`✅ Concluído! R$ ${valorFinal.toFixed(2)} registrado.`);
         
@@ -526,13 +506,8 @@ async function concluirAtendimento(agendamentoId) {
         if (typeof carregarRelatorioFaturamento === "function") carregarRelatorioFaturamento();
 
     } catch (err) {
-        console.error("Erro ao concluir:", err);
-        alert("Erro técnico ao salvar. Verifique o console.");
     }
 }
-// ==========================================
-// TELA 3: GESTÃO DE SERVIÇOS
-// ==========================================
 
 async function carregarServicosBD() {
     try {
@@ -544,13 +519,10 @@ async function carregarServicosBD() {
 
         if (error) throw error;
 
-        // Atualiza a lista local para o modal
         listaServicosLocal = data.map(s => `${s.nome} - R$ ${parseFloat(s.preco).toFixed(2).replace('.', ',')}`);
         
-        // Atualiza o <select> do formulário de criação de vagas
         atualizarSelectServicos();
     } catch (e) { 
-        console.error("Erro ao carregar serviços:", e); 
     }
 }
 
@@ -589,7 +561,6 @@ async function adicionarServicoLista() {
     const precoInput = document.getElementById('novoServicoPreco');
     
     const nome = nomeInput.value.trim();
-    // Limpa o preço para aceitar pontos ou vírgulas e converter para número
     const preco = precoInput.value.replace('R$', '').replace(',', '.').trim();
 
     if (!nome || !preco) {
@@ -598,7 +569,6 @@ async function adicionarServicoLista() {
     }
 
     try {
-        // 1. Salva no banco de dados Supabase
         const { error } = await _supabase
             .from('servicos')
             .insert([{ 
@@ -609,18 +579,14 @@ async function adicionarServicoLista() {
 
         if (error) throw error;
 
-        // 2. Limpa os campos do modal
         nomeInput.value = '';
         precoInput.value = '';
         
-        // 3. ATUALIZAÇÃO EM TEMPO REAL:
-        // Recarrega os serviços do banco para a lista local e para o formulário
         await carregarServicosBD(); 
-        renderizarListaConfig(); // Atualiza a lista visual dentro do modal
+        renderizarListaConfig();
         
         exibirStatus("✅ Serviço adicionado!");
     } catch (e) {
-        console.error("Erro ao salvar serviço:", e);
         alert("Erro ao salvar serviço no banco de dados.");
     }
 }
@@ -640,11 +606,10 @@ async function removerServicoLista(index) {
 
         if (error) throw error;
 
-        await carregarServicosBD(); // Recarrega do banco
-        renderizarListaConfig();    // Atualiza modal
+        await carregarServicosBD();
+        renderizarListaConfig();
         exibirStatus("🗑️ Serviço removido!");
     } catch (e) {
-        console.error(e);
     }
 }
 
@@ -663,38 +628,42 @@ async function salvarServicosNoGoogle() {
 }
 
 async function deletarAgendamento(id) {
-    if (!confirm("Tem certeza que deseja excluir este agendamento?")) return;
+    if (!confirm("Tem certeza que deseja cancelar este agendamento? Ele voltará a ficar disponível.")) return;
 
     try {
         const { error } = await _supabase
-            .from('agendamentos') // Tabela de compromissos
-            .delete()
+            .from('agendamentos') 
+            .update({ 
+                status: 'disponivel', 
+                cliente_nome: null, 
+                cliente_whatsapp: null, 
+                servico: null,
+                preco_final: 0
+            })
             .eq('id', id);
 
         if (error) throw error;
-        listarAgendaClientes(); // Recarrega a lista de clientes
-        exibirStatus("🗑️ Agendamento removido!");
+        
+        if (typeof listarAgendaClientes === 'function') await listarAgendaClientes();
+        if (typeof listarHorarios === 'function') await listarHorarios();
+        
+        exibirStatus("✅ Agendamento liberado!");
     } catch (err) {
-        console.error("Erro ao deletar:", err);
+        alert("Erro ao tentar liberar o horário.");
     }
 }
 
-// ==========================================
-// LÓGICA DO FORMULÁRIO (GERAR / EDITAR)
-// ==========================================
 
 function toggleFormulario() {
     if (formContainer.classList.contains('hidden')) {
         formContainer.classList.remove('hidden');
         btnAbrirForm.textContent = "✖️ Fechar";
         
-        // Se NÃO estivermos editando, garantimos que o formulário apareça no modo "Gerar Vagas"
         if (!idSendoEditado) {
             document.getElementById('titulo-form').textContent = "Configurar Grade de Horários";
             document.getElementById('btnSalvar').textContent = "Gerar Horários";
             document.getElementById('campos-edicao-cliente').classList.add('hidden');
             
-            // Reexibe os campos de geração em massa que a edição esconde
             exibirCamposMassa(true);
         }
     } else {
@@ -702,30 +671,23 @@ function toggleFormulario() {
     }
 }
 
-// Função auxiliar para limpar tudo ao fechar
 function fecharELimparFormulario() {
     formContainer.classList.add('hidden');
     btnAbrirForm.textContent = "➕ Gerar Horários";
     
-    // Reseta o estado de edição
     idSendoEditado = null;
     
-    // Limpa os campos de texto
     document.getElementById('scheduleForm').reset();
     
-    // Volta o título e botão ao padrão
     document.getElementById('titulo-form').textContent = "Configurar Grade de Horários";
     document.getElementById('btnSalvar').textContent = "Gerar Horários";
     document.getElementById('btnSalvar').style.background = ""; // Volta cor original do CSS
     
-    // Garante que os campos de cliente sumam
     document.getElementById('campos-edicao-cliente').classList.add('hidden');
     
-    // Mostra os campos de massa novamente para a próxima vez
     exibirCamposMassa(true);
 }
 
-// Função para mostrar/esconder campos de geração em massa
 function exibirCamposMassa(exibir) {
     const display = exibir ? 'block' : 'none';
     const campos = [
@@ -742,8 +704,10 @@ function exibirCamposMassa(exibir) {
 }
 
 
+let dataOriginalSendoEditada = null;
+let horaOriginalSendoEditada = null;
+
 async function prepararEdicao(id) {
-    console.log("Editando ID:", id); // Log para você ver no console se o clique funcionou
     idSendoEditado = id;
 
     try {
@@ -755,15 +719,14 @@ async function prepararEdicao(id) {
 
         if (error) throw error;
 
-        // 1. Muda para a tela onde está o formulário
-        mudarTela('gerar');
+        dataOriginalSendoEditada = item.data;
+        horaOriginalSendoEditada = item.horario;
 
-        // 2. Garante que o formulário e os campos de cliente apareçam
+        mudarTela('gerar');
         formContainer.classList.remove('hidden');
         document.getElementById('campos-edicao-cliente').classList.remove('hidden');
         btnAbrirForm.textContent = "✖️ Cancelar Edição";
 
-        // 3. Preenche os campos (usando os IDs que estão no seu HTML)
         const nome = document.getElementById('cliente_nome');
         const whats = document.getElementById('cliente_whatsapp');
         const serv = document.getElementById('servico');
@@ -772,14 +735,35 @@ async function prepararEdicao(id) {
 
         if (nome) nome.value = item.cliente_nome || "";
         if (whats) whats.value = item.cliente_whatsapp || "";
-        if (serv) serv.value = item.servico || "";
+        
+        if (serv) {
+            serv.multiple = true; 
+
+            const servicosSalvos = item.servico ? item.servico.split(',').map(s => s.trim()) : [];
+
+            Array.from(serv.options).forEach(option => {
+                option.selected = servicosSalvos.some(s => 
+                    option.value.includes(s) || option.text.includes(s)
+                );
+            });
+
+            serv.onmousedown = function(e) {
+                e.preventDefault();
+                const option = e.target;
+                if (option.tagName === 'OPTION') {
+                    option.selected = !option.selected;
+                    this.dispatchEvent(new Event('change'));
+                }
+            };
+            
+            serv.dispatchEvent(new Event('change'));
+            calcularPrecoTotal(); // Adicione isso para calcular ao abrir a edição
+        }
+
         if (data) data.value = item.data || "";
         if (hora) hora.value = item.horario ? item.horario.substring(0, 5) : "";
 
-        // 4. Esconde campos de geração em massa para não confundir
         exibirCamposMassa(false);
-
-        // 5. Muda o botão de ação
         const btnSalvar = document.getElementById('btnSalvar');
         btnSalvar.innerHTML = "💾 SALVAR ALTERAÇÕES";
         btnSalvar.style.background = "#2dce89";
@@ -787,82 +771,58 @@ async function prepararEdicao(id) {
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
     } catch (err) {
-        console.error("Erro ao carregar dados:", err);
         alert("Não foi possível carregar os dados para edição.");
     }
+
 }
 
 if (form) {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
-        // 1. Bloqueio de segurança
-        if (!barbeiroLogadoId) {
-            alert("Erro: Seu usuário não está identificado. Faça login novamente.");
+
+        const idBarbeiro = barbeiroLogadoId || localStorage.getItem('barbeiro_id');
+        if (!idBarbeiro) {
+            alert("Erro: Sessão expirada. Faça login novamente.");
             return;
         }
 
-        // 2. Captura de Elementos
         const elDataInicio = document.getElementById('dataInicio');
         const elDataFim = document.getElementById('dataFim');
         const elHoraInicio = document.getElementById('horaInicio');
         const elHoraFim = document.getElementById('horaFim');
         const elIntervalo = document.getElementById('intervalo');
-        const elServico = document.getElementById('servico');
-        const elAlmocoInicio = document.getElementById('almocoInicio');
-        const elAlmocoFim = document.getElementById('almocoFim');
-
-        if (!elDataInicio || !elHoraInicio || !elIntervalo) {
-            console.error("Erro: Campos essenciais não encontrados.");
-            return;
-        }
+        const elServico = document.getElementById('servico'); // Este é o seu <select multiple>
+        const btnSalvar = document.getElementById('btnSalvar');
 
         btnSalvar.disabled = true;
         btnSalvar.textContent = "🚀 Processando...";
 
         try {
             if (!idSendoEditado) {
-                // MODO: Geração em massa
                 const dataInicioInput = elDataInicio.value;
                 const dataFimInput = elDataFim ? elDataFim.value : dataInicioInput;
                 const hInicio = elHoraInicio.value;
                 const hFim = elHoraFim ? elHoraFim.value : hInicio;
-                const intervalo = parseInt(elIntervalo.value) || 30;
+                const intervalo = elIntervalo ? parseInt(elIntervalo.value) : 30;
                 
-                const almocoInicio = elAlmocoInicio ? elAlmocoInicio.value : null;
-                const almocoFim = elAlmocoFim ? elAlmocoFim.value : null;
-                const servicoSelecionado = elServico ? elServico.value : null;
+                const servicosSelecionados = Array.from(elServico.selectedOptions).map(o => o.value).join(', ');
 
                 const diasSelecionados = Array.from(document.querySelectorAll('input[name="dia_sem"]:checked')).map(el => parseInt(el.value));
-                
-                if (diasSelecionados.length === 0) {
-                    alert("Selecione pelo menos um dia da semana!");
-                    btnSalvar.disabled = false;
-                    btnSalvar.textContent = "Gerar Horários";
-                    return;
-                }
+                if (diasSelecionados.length === 0) throw new Error("Selecione pelo menos um dia da semana!");
 
-                // --- INÍCIO DA VALIDAÇÃO DE DUPLICIDADE ---
-                // Busca todos os horários já existentes para este barbeiro no período selecionado
-                const { data: horariosExistentes, error: erroConsulta } = await _supabase
+                const { data: existentes, error: erroConsulta } = await _supabase
                     .from('agendamentos')
                     .select('data, horario')
-                    .eq('barbeiro_id', barbeiroLogadoId)
+                    .eq('barbeiro_id', idBarbeiro)
                     .gte('data', dataInicioInput)
                     .lte('data', dataFimInput);
 
                 if (erroConsulta) throw erroConsulta;
 
-                // Criamos um mapa (Set) para busca rápida de "Data Hora"
-                const mapaExistentes = new Set(
-                    horariosExistentes.map(h => `${h.data} ${h.horario}`)
-                );
-                // --- FIM DA VALIDAÇÃO ---
-
+                const mapaExistentes = new Set(existentes.map(h => `${h.data} ${h.horario}`));
                 let dataAtual = new Date(dataInicioInput + 'T12:00:00');
                 const dataFinal = new Date(dataFimInput + 'T12:00:00');
                 let novasVagas = [];
-                let contagemDuplicados = 0;
 
                 while (dataAtual <= dataFinal) {
                     if (diasSelecionados.includes(dataAtual.getDay())) {
@@ -871,35 +831,21 @@ if (form) {
                         let tempoMinutos = h * 60 + m;
                         let tempoFimMinutos = hf * 60 + mf;
 
-                        let minAlmocoIni = -1, minAlmocoFim = -1;
-                        if (almocoInicio && almocoFim) {
-                            let [haI, maI] = almocoInicio.split(':').map(Number);
-                            let [haF, maF] = almocoFim.split(':').map(Number);
-                            minAlmocoIni = haI * 60 + maI;
-                            minAlmocoFim = haF * 60 + maF;
-                        }
-
                         while (tempoMinutos < tempoFimMinutos) {
-                            if (!(tempoMinutos >= minAlmocoIni && tempoMinutos < minAlmocoFim)) {
-                                let hh = Math.floor(tempoMinutos / 60).toString().padStart(2, '0');
-                                let mm = (tempoMinutos % 60).toString().padStart(2, '0');
-                                
-                                const dataString = dataAtual.toISOString().split('T')[0];
-                                const horaString = `${hh}:${mm}:00`;
+                            let hh = Math.floor(tempoMinutos / 60).toString().padStart(2, '0');
+                            let mm = (tempoMinutos % 60).toString().padStart(2, '0');
+                            const dataString = dataAtual.toISOString().split('T')[0];
+                            const horaString = `${hh}:${mm}:00`;
 
-                                // Verifica se já existe no mapa antes de adicionar à lista de insert
-                                if (mapaExistentes.has(`${dataString} ${horaString}`)) {
-                                    contagemDuplicados++;
-                                } else {
-                                    novasVagas.push({
-                                        barbearia_id: BARBEARIA_ID,
-                                        barbeiro_id: barbeiroLogadoId,
-                                        data: dataString,
-                                        horario: horaString,
-                                        status: 'disponivel',
-                                        servico: servicoSelecionado
-                                    });
-                                }
+                            if (!mapaExistentes.has(`${dataString} ${horaString}`)) {
+                                novasVagas.push({
+                                    barbearia_id: BARBEARIA_ID,
+                                    barbeiro_id: idBarbeiro,
+                                    data: dataString,
+                                    horario: horaString,
+                                    status: 'disponivel',
+                                    servico: servicosSelecionados
+                                });
                             }
                             tempoMinutos += intervalo;
                         }
@@ -909,44 +855,95 @@ if (form) {
 
                 if (novasVagas.length > 0) {
                     const { error } = await _supabase.from('agendamentos').insert(novasVagas);
-                    if (error) {
-                        if (error.code === '23503') throw new Error("Usuário não vinculado à tabela barbeiros.");
-                        throw error;
-                    }
-                    
-                    let msg = `✅ ${novasVagas.length} horários gerados!`;
-                    if (contagemDuplicados > 0) msg += `\n⚠️ ${contagemDuplicados} duplicados ignorados.`;
-                    alert(msg);
+                    if (error) throw error;
+                    alert(`✅ ${novasVagas.length} horários gerados!`);
                 } else {
-                    alert("⚠️ Nenhum horário novo foi gerado (todos já existem ou estão fora dos dias).");
+                    alert("⚠️ Nenhum horário novo foi gerado.");
                 }
 
             } else {
-                // MODO: Edição de vaga única
-                const { error } = await _supabase
+                const nomeCliente = document.getElementById('cliente_nome')?.value.trim();
+                const zapCliente = document.getElementById('cliente_whatsapp')?.value.trim();
+                
+                if (!nomeCliente || nomeCliente.length < 3) throw new Error("Nome do cliente é obrigatório.");
+
+                const novaData = elDataInicio.value;
+                const novoHorario = elHoraInicio.value + ":00";
+                
+                const servicosEscolhidos = Array.from(elServico.selectedOptions).map(o => o.value).join(', ');
+
+                await _supabase
+                    .from('agendamentos')
+                    .delete()
+                    .eq('barbeiro_id', idBarbeiro)
+                    .eq('data', novaData)
+                    .eq('horario', novoHorario)
+                    .eq('status', 'disponivel');
+
+                const precoFinal = calcularPrecoTotal(); 
+
+                const { error: errorUpdate } = await _supabase
                     .from('agendamentos')
                     .update({
-                        horario: elHoraInicio.value + ":00",
-                        servico: elServico ? elServico.value : null
+                        data: novaData,
+                        horario: novoHorario,
+                        servico: servicosEscolhidos,
+                        cliente_nome: nomeCliente,
+                        cliente_whatsapp: zapCliente || '00000000000',
+                        preco_final: precoFinal,
+                        status: 'ocupado'
                     })
                     .eq('id', idSendoEditado);
                 
-                if (error) throw error;
-                alert("✅ Horário atualizado!");
+                if (errorUpdate) throw errorUpdate;
+
+                if (dataOriginalSendoEditada && (dataOriginalSendoEditada !== novaData || horaOriginalSendoEditada !== novoHorario)) {
+                    const { data: registroAntigo } = await _supabase
+                        .from('agendamentos')
+                        .select('id')
+                        .eq('barbeiro_id', idBarbeiro)
+                        .eq('data', dataOriginalSendoEditada)
+                        .eq('horario', horaOriginalSendoEditada)
+                        .maybeSingle();
+
+                    if (registroAntigo) {
+                        await _supabase
+                            .from('agendamentos')
+                            .update({ 
+                                status: 'disponivel', 
+                                cliente_nome: null, 
+                                cliente_whatsapp: null, 
+                                servico: null 
+                            })
+                            .eq('id', registroAntigo.id);
+                    } else {
+                        await _supabase
+                            .from('agendamentos')
+                            .insert({
+                                barbearia_id: BARBEARIA_ID,
+                                barbeiro_id: idBarbeiro,
+                                data: dataOriginalSendoEditada,
+                                horario: horaOriginalSendoEditada,
+                                status: 'disponivel'
+                            });
+                    }
+                }
+                alert("✅ Agendamento atualizado com sucesso!");
             }
 
             fecharELimparFormulario();
             await listarHorarios();
+            if (typeof listarAgendaClientes === 'function') await listarAgendaClientes();
 
         } catch (error) {
-            console.error("Erro ao salvar horários:", error);
-            alert(error.message || "Erro ao salvar.");
+            alert("Erro: " + (error.message || JSON.stringify(error)));
         } finally {
             btnSalvar.disabled = false;
-            btnSalvar.textContent = "Gerar Horários";
+            btnSalvar.textContent = idSendoEditado ? "💾 SALVAR ALTERAÇÕES" : "Gerar Horários";
         }
     });
 }
+document.getElementById('servico').addEventListener('change', calcularPrecoTotal);
 
 function exibirStatus(msg) {
     if (!statusDiv) return;
@@ -955,12 +952,10 @@ function exibirStatus(msg) {
     setTimeout(() => { statusDiv.style.display = 'none'; }, 3000);
 }
 
-// Abrir e Fechar Modal
 function abrirModalBarbeiros() {
     const modal = document.getElementById('modalBarbeiros');
     if (modal) {
         modal.classList.remove('hidden');
-        // USAR SEMPRE A VERSÃO 'Config' que é a mais atualizada que fizemos
         listarBarbeirosConfig(); 
     }
 }
@@ -969,10 +964,7 @@ function fecharModalBarbeiros() {
     document.getElementById('modalBarbeiros').classList.add('hidden');
 }
 
-// Listar Barbeiros Cadastrados
 
-
-// Adicionar Novo Barbeiro
 async function adicionarBarbeiro() {
     const nome = document.getElementById('novoBarbeiroNome').value;
     const email = document.getElementById('novoBarbeiroEmail').value.toLowerCase().trim();
@@ -981,7 +973,6 @@ async function adicionarBarbeiro() {
 
     exibirStatus("⌛ Sincronizando...");
 
-    // Se for o dono, usa o UUID fixo. Para outros, deixamos o banco lidar ou o upsert resolver.
     const objeto = { 
         nome: nome, 
         email: email, 
@@ -997,7 +988,6 @@ async function adicionarBarbeiro() {
         .upsert([objeto], { onConflict: 'email' });
 
     if (error) {
-        console.error(error);
         alert("Erro ao cadastrar: " + error.message);
     } else {
         exibirStatus("✅ Barbeiro sincronizado!");
@@ -1013,9 +1003,7 @@ async function removerBarbeiro(id) {
     listarBarbeiros();
 }
 
-/**
- * Realiza o upload da foto para o Storage e salva a URL no perfil do barbeiro
- */
+
 async function uploadFotoPerfil(event) {
     const file = event.target.files[0];
     const idUsuario = barbeiroLogadoId || localStorage.getItem('barbeiro_id');
@@ -1028,27 +1016,23 @@ async function uploadFotoPerfil(event) {
     try {
         const fileName = `avatar_${idUsuario}_${Date.now()}`;
         
-        // 1. Upload Storage
         const { data: uploadData, error: uploadError } = await _supabase.storage
             .from('barbearia-files')
             .upload(fileName, file);
 
         if (uploadError) throw uploadError;
 
-        // 2. URL Pública
         const { data: { publicUrl } } = _supabase.storage
             .from('barbearia-files')
             .getPublicUrl(fileName);
 
-        // 3. Update no Banco (Onde dava erro 400)
        const { error: updateError } = await _supabase
         .from('barbeiros')
         .update({ foto_url: publicUrl }) 
-        .eq('id', barbeiroLogadoId); // <--- Esse ID tem que ser o do funcionário!
+        .eq('id', barbeiroLogadoId);
 
         if (updateError) throw updateError;
 
-        // 4. Sucesso Visual
         const imgPreview = document.getElementById('imgPerfil');
         if (imgPreview) imgPreview.src = `${publicUrl}?t=${Date.now()}`;
         m ,  
@@ -1059,17 +1043,11 @@ async function uploadFotoPerfil(event) {
     }
 }
 
-/**
- * Carrega a foto atual do barbeiro ao iniciar
- */
-// No seu arquivo script.js (Parte do Painel ADM)
+
 async function carregarFotoPerfil() {
-    // Tenta pegar o ID da memória ou do localStorage
     const idParaConsulta = barbeiroLogadoId || localStorage.getItem('barbeiro_id');
 
-    // Se continuar undefined, para aqui e evita o erro 400
     if (!idParaConsulta || idParaConsulta === "undefined") {
-        console.warn("Cancelando carregarFotoPerfil: ID não encontrado.");
         return;
     }
 
@@ -1089,14 +1067,11 @@ async function carregarFotoPerfil() {
             }
         }
     } catch (err) {
-        console.error("Erro ao carregar foto:", err);
     }
 }
 
 async function cadastrarBarbeiroCompleto(email, senha, nome) {
     try {
-        // PASSO 1: Criar o usuário no Supabase Auth
-        // Isso gera o ID oficial na tabela auth.users
         const { data: authData, error: authError } = await _supabase.auth.signUp({
             email: email,
             password: senha
@@ -1104,14 +1079,12 @@ async function cadastrarBarbeiroCompleto(email, senha, nome) {
 
         if (authError) throw authError;
 
-        // O ID que o Supabase acabou de criar para esse novo login
         const novoIdAutenticado = authData.user.id;
 
-        // PASSO 2: Agora sim, inserir na sua tabela pública usando o ID gerado
         const { error: dbError } = await _supabase
             .from('barbeiros')
             .insert([{
-                id: novoIdAutenticado, // Vínculo perfeito com o Auth
+                id: novoIdAutenticado,
                 nome: nome,
                 email: email,
                 barbearia_id: BARBEARIA_ID,
@@ -1119,33 +1092,24 @@ async function cadastrarBarbeiroCompleto(email, senha, nome) {
             }]);
 
         if (dbError) {
-            // Se der erro aqui, o usuário foi criado no Auth mas não na tabela.
-            // É raro, mas importante tratar.
-            console.error("Erro ao salvar dados extras:", dbError);
             throw dbError;
         }
 
         alert("Sucesso! Barbeiro autenticado e cadastrado.");
 
     } catch (err) {
-        console.error("Erro no processo:", err.message);
         alert("Falha no cadastro: " + err.message);
     }
 }
 
-// =========================================
-// GESTÃO DE EQUIPE (CADASTRO ADM)
-// =========================================
 
 async function realizarCadastroCompleto() {
-    // 1. Referências dos elementos
     const nomeInput = document.getElementById('novoBarbeiroNome');
     const emailInput = document.getElementById('novoBarbeiroEmail');
     const senhaInput = document.getElementById('novoBarbeiroSenha');
     const btn = document.getElementById('btnCadastrarEquipe');
     const status = document.getElementById('statusCadastro');
 
-    // 2. Captura e Limpeza
     const nome = typeof sanitizar === "function" ? sanitizar(nomeInput.value) : nomeInput.value.trim();
     const email = emailInput.value.trim().toLowerCase();
     const senha = senhaInput.value.trim();
@@ -1153,7 +1117,6 @@ async function realizarCadastroCompleto() {
     if (!nome || !email || !senha) return alert("⚠️ Preencha todos os campos.");
     if (senha.length < 6) return alert("⚠️ A senha deve ter no mínimo 6 caracteres.");
 
-    // 3. Interface de Carregamento
     btn.disabled = true;
     const textoOriginal = btn.innerText;
     btn.innerText = "⏳ Processando...";
@@ -1161,9 +1124,6 @@ async function realizarCadastroCompleto() {
     status.innerText = "Criando credenciais...";
 
     try {
-        // --- O PULO DO GATO ---
-        // Criamos um cliente temporário que NÃO PERSISTE sessão. 
-        // Isso impede que o Supabase sobrescreva seu login de ADM.
         const supabaseCadastro = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
             auth: {
                 persistSession: false,
@@ -1172,7 +1132,6 @@ async function realizarCadastroCompleto() {
             }
         });
 
-        // PASSO 1: Criar o usuário usando o cliente ISOLADO
         const { data: authData, error: authError } = await supabaseCadastro.auth.signUp({
             email: email,
             password: senha,
@@ -1187,8 +1146,6 @@ async function realizarCadastroCompleto() {
         if (authError) throw new Error(`Erro no Auth: ${authError.message}`);
         const novoUsuarioId = authData.user.id;
 
-        // PASSO 2: Inserir na tabela usando o cliente ORIGINAL (_supabase)
-        // Usamos o seu login de ADM para ter permissão de escrita no banco
         const { error: dbError } = await _supabase
             .from('barbeiros')
             .insert([{
@@ -1201,12 +1158,10 @@ async function realizarCadastroCompleto() {
 
         if (dbError) throw new Error(`Erro no Banco: ${dbError.message}`);
 
-        // 5. Sucesso
         status.innerText = "🎉 Barbeiro cadastrado com sucesso!";
         status.style.color = "green";
         btn.innerText = "✔️ Cadastrado";
         
-        // Limpeza
         nomeInput.value = "";
         emailInput.value = "";
         senhaInput.value = "";
@@ -1220,7 +1175,6 @@ async function realizarCadastroCompleto() {
         }, 3000);
 
     } catch (err) {
-        console.error("Falha no cadastro:", err);
         alert(err.message);
         btn.disabled = false;
         btn.innerText = "Tentar Novamente";
@@ -1233,11 +1187,9 @@ async function listarBarbeirosConfig() {
     const listaUl = document.getElementById('listaBarbeirosConfig');
     if (!listaUl) return;
 
-    // Feedback visual de carregamento
     listaUl.innerHTML = '<li style="text-align:center; padding:20px; color:#666;">⌛ Carregando equipe...</li>';
 
     try {
-        // Busca todos os barbeiros (incluindo a coluna 'ativo')
         const { data: barbeiros, error } = await _supabase
             .from('barbeiros')
             .select('*')
@@ -1258,7 +1210,6 @@ async function listarBarbeirosConfig() {
             const li = document.createElement('li');
             const estaAtivo = barbeiro.ativo === true;
 
-            // Estilização base do item
             li.style.display = 'flex';
             li.style.alignItems = 'center';
             li.style.gap = '12px';
@@ -1269,7 +1220,6 @@ async function listarBarbeirosConfig() {
             li.style.marginBottom = '8px';
             li.style.transition = 'opacity 0.3s ease';
             
-            // Se estiver inativo, deixamos o item meio transparente
             if (!estaAtivo) {
                 li.style.opacity = '0.6';
             }
@@ -1297,7 +1247,6 @@ async function listarBarbeirosConfig() {
         });
 
     } catch (err) {
-        console.error("Erro ao listar equipe:", err);
         listaUl.innerHTML = '<li style="text-align:center; padding:20px; color:red;">Erro ao carregar lista.</li>';
     }
 }
@@ -1314,7 +1263,7 @@ async function removerBarbeiroDaEquipe(id, nome) {
         if (error) throw error;
 
         alert("Barbeiro removido com sucesso!");
-        listarBarbeirosConfig(); // Atualiza a lista na tela
+        listarBarbeirosConfig();
 
     } catch (err) {
         alert("Erro ao remover: " + err.message);
@@ -1323,12 +1272,11 @@ async function removerBarbeiroDaEquipe(id, nome) {
 
 function abrirModalSenha() {
     document.getElementById('modalSenha').classList.remove('hidden');
-    document.getElementById('novaSenhaInput').focus(); // Dá foco automático ao abrir
+    document.getElementById('novaSenhaInput').focus();
 }
 
 function fecharModalSenha() {
     document.getElementById('modalSenha').classList.add('hidden');
-    // Limpa os campos ao fechar
     document.getElementById('novaSenhaInput').value = "";
     document.getElementById('confirmarSenhaInput').value = "";
 }
@@ -1349,12 +1297,10 @@ async function executarTrocaSenha() {
         const { error } = await _supabase.auth.updateUser({ password: novaSenha });
         if (error) throw error;
 
-        // FEEDBACK DE SUCESSO
         status.style.display = "block";
         status.innerText = "✅ Senha alterada com sucesso!";
         status.style.color = "green";
 
-        // FECHAMENTO AUTOMÁTICO APÓS 1.5 SEGUNDOS
         setTimeout(() => {
             fecharModalSenha();
             btn.disabled = false;
@@ -1386,7 +1332,6 @@ async function solicitarRecuperacaoSenha() {
         return;
     }
 
-    // 3. Feedback visual no link/botão
     const btnLink = event.target;
     const textoOriginal = btnLink.innerText;
     
@@ -1417,34 +1362,27 @@ async function alternarStatusBarbeiro(id, statusAtual) {
     if (!confirm(`Tem certeza que deseja ${acao} este funcionário?`)) return;
 
     try {
-        console.log("Iniciando Update - ID:", id, "Novo Status:", novoStatus);
-
         const { data, error } = await _supabase
             .from('barbeiros')
             .update({ ativo: novoStatus })
-            .eq('id', id) // Verifique se no banco a coluna chama 'id' ou 'usuario_id'
+            .eq('id', id)
             .select();
 
         if (error) {
-            console.error("Erro retornado pelo Supabase:", error);
             throw new Error(error.message);
         }
 
         if (!data || data.length === 0) {
-            // Se cair aqui após você criar a Policy, o problema é o ID que não existe na tabela
-            console.error("Dados retornados vazios. O ID existe na tabela barbeiros?");
             throw new Error("ID não encontrado ou bloqueado pela RLS.");
         }
 
         alert(`✅ Sucesso! Funcionário ${novoStatus ? 'Ativo' : 'Desativado'}.`);
         
-        // Recarrega a lista para atualizar a interface
         if (typeof listarBarbeirosConfig === "function") {
             await listarBarbeirosConfig();
         }
 
     } catch (err) {
-        console.error("Erro detalhado:", err);
         alert("❌ Falha na operação: " + err.message);
     }
 }
@@ -1455,21 +1393,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     // 1. Obtém a sessão atual
     const { data: { session } } = await _supabase.auth.getSession();
 
-    // 2. Verifica se o usuário veio por um link de recuperação (Esqueci Senha)
-    // O Supabase pode enviar os dados via Hash (#) ou Query (?)
     const urlParams = new URLSearchParams(window.location.hash.replace('#', '?'));
     const isRecovery = urlParams.get('type') === 'recovery' || window.location.hash.includes('access_token');
 
     if (session || isRecovery) {
-        // Se houver sessão, define o ID do barbeiro
         if (session) {
             barbeiroLogadoId = session.user.id;
         }
         
-        // Esconde a tela de login
         if (telaLogin) telaLogin.style.display = 'none';
 
-        // Inicializações padrão
         await verificarPermissoes();
         if (typeof carregarFotoPerfil === "function") carregarFotoPerfil();
         if (typeof configurarCalendario === "function") configurarCalendario();
@@ -1482,26 +1415,18 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         if (typeof listarHorarios === "function") listarHorarios();
 
-        // 3. Gatilho específico para Redefinição de Senha
         if (isRecovery) {
             setTimeout(() => {
-                // Abre o modal centralizado que criamos
                 if (typeof abrirModalSenha === "function") {
                     abrirModalSenha();
-                    // Opcional: um aviso mais amigável que o alert
-                    console.log("Modo de recuperação de senha ativado.");
                 }
-            }, 1200); // Um pouco mais de tempo para garantir que o Supabase validou o token
+            }, 1200); 
         }
 
     } else {
-        // Se não houver sessão nem recuperação, mostra o login
         if (telaLogin) telaLogin.style.display = 'flex';
     }
 
-
-
-    // ESCUTADOR EM TEMPO REAL PARA DESLOGAR QUEM FOR DESATIVADO
 const canalBarbeiros = _supabase
   .channel('mudancas-status')
   .on(
@@ -1512,13 +1437,10 @@ const canalBarbeiros = _supabase
       table: 'barbeiros'
     },
     (payload) => {
-      // 1. Verifica se a mudança foi na coluna 'ativo' e se agora é 'false'
-      // 2. Verifica se o barbeiro alterado é exatamente o que está logado agora
       if (payload.new.id === barbeiroLogadoId && payload.new.ativo === false) {
           
           alert("🚨 Sua conta foi desativada pelo administrador. Você será deslogado agora.");
           
-          // Executa o logout
           _supabase.auth.signOut().then(() => {
               window.location.reload(); // Recarrega para voltar à tela de login
           });
@@ -1542,11 +1464,9 @@ async function verificarPermissoes() {
     if (ehAdmin) {
         if (btnEquipeDesk) btnEquipeDesk.style.display = 'block';
         if (btnEquipeMobile) btnEquipeMobile.style.display = 'flex';
-        console.log("Nível de acesso: Administrador");
     } else {
         if (btnEquipeDesk) btnEquipeDesk.style.display = 'none';
         if (btnEquipeMobile) btnEquipeMobile.style.display = 'none';
-        console.log("Nível de acesso: Barbeiro");
     }
 }
 
@@ -1562,7 +1482,6 @@ async function uploadFotoCorte(event, agendamentoId) {
         const fileName = `${agendamentoId}_${Date.now()}.${fileExt}`;
         const filePath = `cortes/${fileName}`;
 
-        // 1. Envia o arquivo para o Storage
         const { error: uploadError } = await _supabase.storage
             .from('fotos_cortes')
             .upload(filePath, file);
@@ -1574,7 +1493,6 @@ async function uploadFotoCorte(event, agendamentoId) {
             .from('fotos_cortes')
             .getPublicUrl(filePath);
 
-        // 3. Busca a lista atual de fotos do agendamento
         const { data: agendamento, error: selectError } = await _supabase
             .from('agendamentos')
             .select('foto_corte')
@@ -1583,26 +1501,21 @@ async function uploadFotoCorte(event, agendamentoId) {
 
         if (selectError) throw selectError;
 
-        // Garante que fotosAtuais seja um array (pode vir null do banco)
         let fotosAtuais = agendamento.foto_corte || [];
         
-        // Adiciona a nova URL à lista
         fotosAtuais.push(publicUrl);
 
-        // 4. Atualiza o banco com a lista completa
         const { error: updateError } = await _supabase
             .from('agendamentos')
-            .update({ foto_corte: fotosAtuais }) // Envia o array atualizado
+            .update({ foto_corte: fotosAtuais })
             .eq('id', agendamentoId);
 
         if (updateError) throw updateError;
 
         exibirStatus("✅ Foto adicionada!");
-        listarAgendaClientes(); // Recarrega para mostrar a nova foto
+        listarAgendaClientes();
 
     } catch (e) {
-        console.error("Erro no upload múltiplo:", e);
-        alert("Erro ao enviar foto. Verifique o console.");
     }
 }
 
@@ -1621,7 +1534,6 @@ function enviarLembreteWhatsapp(nome, horario, whatsapp) {
     const numLimpo = whatsapp.replace(/\D/g, '');
     const msg = encodeURIComponent(`Olá ${nome}! ✂️ Passando para confirmar seu horário hoje às ${horario.substring(0,5)}. Te esperamos!`);
     
-    // Abre em uma nova aba (funciona no PC e Celular)
     window.open(`https://wa.me/55${numLimpo}?text=${msg}`, '_blank');
 }
 
@@ -1643,7 +1555,6 @@ function enviarLembreteDireto(nome, horario, telefone) {
     window.open(url, '_blank');
 }
 
-// Variáveis para gerenciar a fila de alertas
 let filaDeAlertas = [];
 let ultimoClienteAlertadoId = null;
 
@@ -1654,7 +1565,6 @@ function verificarProximosAtendimentos(agendamentos) {
     filaDeAlertas = [];
 
     agendamentos.forEach(item => {
-        // Pula se: sem dados, já enviado, ou vaga disponível
         if (!item.cliente_nome || !item.cliente_whatsapp || item.lembrete_enviado === true || item.status === 'disponivel') {
             return;
         }
@@ -1666,9 +1576,6 @@ function verificarProximosAtendimentos(agendamentos) {
         const diferenca = dataAgendamento - agora;
         const minutosRestantes = Math.floor(diferenca / 1000 / 60);
 
-        // --- LÓGICA DE 1 HORA COM MARGEM DE ATRASO ---
-        // minutosRestantes <= 60: Começa a avisar 1 hora antes
-        // minutosRestantes >= -15: Continua avisando até 15 minutos após o horário ter passado
         if (minutosRestantes <= 60 && minutosRestantes >= -15) { 
             filaDeAlertas.push(item);
         }
@@ -1712,9 +1619,7 @@ function exibirAlertaVisual(item) {
     new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => {});
 }
 
-// Função chamada ao clicar no botão de enviar
 async function processarProximoDaFila(id) {
-    // 1. Abre o WhatsApp primeiro (para não ser bloqueado por pop-up)
     const item = filaDeAlertas[0];
     const numLimpo = item.cliente_whatsapp.replace(/\D/g, '');
     const mensagem = encodeURIComponent(`Olá ${item.cliente_nome}! ✂️ Confirmamos seu horário às ${item.horario.substring(0,5)}. Te esperamos!`);
@@ -1723,17 +1628,14 @@ async function processarProximoDaFila(id) {
     // 2. Remove da fila local
     filaDeAlertas.shift();
     
-    // 3. Marca como enviado no Supabase
     try {
         await _supabase
             .from('agendamentos')
             .update({ lembrete_enviado: true })
             .eq('id', id);
     } catch (error) {
-        console.error("Erro ao salvar status:", error);
     }
 
-    // 4. Limpa alerta e chama o próximo
     const container = document.querySelector('.alerta-proximo-cliente');
     if (container) container.remove();
 
@@ -1742,11 +1644,9 @@ async function processarProximoDaFila(id) {
     }, 1000);
 }
 
-// Função para o "X", caso ele não queira enviar para aquele cliente agora
 async function pularAlerta(id) {
     filaDeAlertas.shift();
     
-    // Marcamos como enviado mesmo no X para o barbeiro não ser "assombrado" pelo mesmo alerta
     await _supabase.from('agendamentos').update({ lembrete_enviado: true }).eq('id', id);
     
     const container = document.querySelector('.alerta-proximo-cliente');
@@ -1755,8 +1655,6 @@ async function pularAlerta(id) {
 }
 
 
-// Atualiza o sistema automaticamente a cada 5 minutos
-// Verifica atualizações a cada 2 minutos (120000ms)
 setInterval(() => {
     if (typeof barbeiroLogadoId !== 'undefined' && barbeiroLogadoId) {
         listarAgendaClientes();
@@ -1776,9 +1674,6 @@ async function carregarRelatorioFaturamento() {
     if (!dataInicio || !dataFim) return;
 
     try {
-        // Log para conferir o que está sendo enviado
-        console.log(`Buscando de ${dataInicio} até ${dataFim} para o Barbeiro: ${barbeiroLogadoId}`);
-
         const { data: relatorio, error } = await _supabase
             .from('agendamentos')
             .select('id, servico, preco_final, status, data') 
@@ -1788,9 +1683,7 @@ async function carregarRelatorioFaturamento() {
             .lte('data', dataFim);
 
         if (error) throw error;
-
-        console.log("Linhas encontradas:", relatorio);
-
+        
         let faturamentoTotal = 0;
         let resumoServicos = {};
 
@@ -1807,99 +1700,127 @@ async function carregarRelatorioFaturamento() {
             resumoServicos[nomeServico].subtotal += valor;
         });
 
-        // --- CÁLCULO DOS INDICADORES ---
         const qtdAtendimentos = relatorio.length;
         const ticketMedio = qtdAtendimentos > 0 ? (faturamentoTotal / qtdAtendimentos) : 0;
 
-        // --- ATUALIZAÇÃO DA INTERFACE ---
-        
-        // 1. Faturamento Total
+        // Atualização Segura usando textContent
+        const formatarMoeda = (valor) => valor.toLocaleString('pt-br', { style: 'currency', currency: 'BRL' });
+
         const elTotal = document.getElementById('fin-total');
         if (elTotal) {
-            elTotal.innerHTML = `<b>${faturamentoTotal.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})}</b>`;
+            elTotal.textContent = formatarMoeda(faturamentoTotal);
         }
 
-        // 2. Quantidade Total
         const elQtd = document.getElementById('fin-qtd');
-        if (elQtd) elQtd.innerText = qtdAtendimentos;
+        if (elQtd) {
+            elQtd.textContent = qtdAtendimentos;
+        }
 
-        // 3. Ticket Médio (NOVO)
         const elTicket = document.getElementById('fin-ticket-medio');
         if (elTicket) {
-            elTicket.innerHTML = `<b>${ticketMedio.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})}</b>`;
+            elTicket.textContent = formatarMoeda(ticketMedio);
         }
 
         renderizarTabelaFinanceira(resumoServicos);
 
     } catch (err) {
-        console.error("Erro técnico no faturamento:", err);
+        console.error("Erro ao carregar financeiro:", err);
     }
 }
 
-// Função auxiliar para desenhar a tabela na tela
 function renderizarTabelaFinanceira(dadosAgrupados) {
     const container = document.getElementById('containerTabelaServicos');
     if (!container) return;
 
-    let html = `
-        <table style="width: 100%; border-collapse: collapse;">
-            <thead style="background: #f8f9fa; text-align: left;">
-                <tr>
-                    <th style="padding: 12px; font-size: 12px; color: #666;">SERVIÇO</th>
-                    <th style="padding: 12px; font-size: 12px; color: #666;">QTD</th>
-                    <th style="padding: 12px; font-size: 12px; color: #666;">TOTAL</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
+    // Limpa o conteúdo atual de forma segura
+    container.textContent = '';
 
+    const table = document.createElement('table');
+    table.style.width = '100%';
+    table.style.borderCollapse = 'collapse';
+
+    // Cabeçalho da Tabela
+    const thead = document.createElement('thead');
+    thead.style.backgroundColor = '#f8f9fa';
+    thead.style.textAlign = 'left';
+
+    const headerRow = document.createElement('tr');
+    ['SERVIÇO', 'QTD', 'TOTAL'].forEach(texto => {
+        const th = document.createElement('th');
+        th.style.padding = '12px';
+        th.style.fontSize = '12px';
+        th.style.color = '#666';
+        th.textContent = texto;
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    // Corpo da Tabela
+    const tbody = document.createElement('tbody');
     const itens = Object.entries(dadosAgrupados);
 
     if (itens.length === 0) {
-        html += '<tr><td colspan="3" style="text-align:center; padding:20px;">Nenhum serviço concluído.</td></tr>';
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 3;
+        td.style.textAlign = 'center';
+        td.style.padding = '20px';
+        td.textContent = 'Nenhum serviço concluído.';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
     } else {
         itens.forEach(([nome, info]) => {
-            html += `
-                <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 12px; font-weight: bold;">${nome}</td>
-                    <td style="padding: 12px;">${info.qtd}</td>
-                    <td style="padding: 12px; color: #2dce89; font-weight: bold;">
-                        ${info.subtotal.toLocaleString('pt-br', {style: 'currency', currency: 'BRL'})}
-                    </td>
-                </tr>
-            `;
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid #eee';
+
+            // Nome do Serviço
+            const tdNome = document.createElement('td');
+            tdNome.style.padding = '12px';
+            tdNome.style.fontWeight = 'bold';
+            tdNome.textContent = nome; // AQUI ESTÁ A BLINDAGEM: qualquer tag no nome será exibida como texto, não executada.
+            
+            // Quantidade
+            const tdQtd = document.createElement('td');
+            tdQtd.style.padding = '12px';
+            tdQtd.textContent = info.qtd;
+
+            // Subtotal
+            const tdTotal = document.createElement('td');
+            tdTotal.style.padding = '12px';
+            tdTotal.style.color = '#2dce89';
+            tdTotal.style.fontWeight = 'bold';
+            tdTotal.textContent = info.subtotal.toLocaleString('pt-br', { style: 'currency', currency: 'BRL' });
+
+            tr.appendChild(tdNome);
+            tr.appendChild(tdQtd);
+            tr.appendChild(tdTotal);
+            tbody.appendChild(tr);
         });
     }
 
-    html += `</tbody></table>`;
-    container.innerHTML = html;
+    table.appendChild(tbody);
+    container.appendChild(table);
 }
 
 function mostrarTelaFinanceiro() {
-    console.log("Tentando abrir tela financeira...");
-
-    // Tenta encontrar a div
     const telaFin = document.getElementById('tela-financeiro');
 
     if (!telaFin) {
-        console.error("Erro: A div 'tela-financeiro' não existe no DOM.");
         alert("Erro técnico: O sistema não encontrou a tela de faturamento no HTML.");
         return;
     }
 
-    // Esconde a agenda e outros elementos
     const esconder = ['secao-agenda', 'form-container', 'btnAbrirForm', 'container-filtros-adm'];
     esconder.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
 
-    // Exibe o financeiro com um pequeno delay para garantir o render
     setTimeout(() => {
         telaFin.style.display = 'block';
         window.scrollTo(0, 0);
         
-        // Configura datas e carrega dados
         const campoInicio = document.getElementById('fin-data-inicio');
         if (campoInicio && !campoInicio.value) {
             const hoje = new Date();
@@ -1911,36 +1832,27 @@ function mostrarTelaFinanceiro() {
     }, 10);
 }
 
-// Função para voltar para a agenda
 function voltarParaAgenda() {
-    // Esconde o financeiro
     const telaFin = document.getElementById('tela-financeiro');
     if (telaFin) telaFin.style.display = 'none';
 
-    // Mostra a agenda e o botão de criar
     if (document.getElementById('secao-agenda')) document.getElementById('secao-agenda').style.display = 'block';
     if (document.getElementById('btnAbrirForm')) document.getElementById('btnAbrirForm').style.display = 'block';
     if (document.getElementById('container-filtros-adm')) document.getElementById('container-filtros-adm').style.display = 'flex';
 }
 
 async function gerarRelatorioFinanceiro() {
-    console.log("Iniciando geração de relatório...");
-
-    // 1. Tenta recuperar o ID do barbeiro (Verificação Dupla)
     let barbeiroId = localStorage.getItem('barbeiroId');
 
-    // Se o localStorage falhar, tenta recuperar da sessão ativa do Supabase
     if (!barbeiroId || barbeiroId === "null" || barbeiroId === "undefined") {
         const { data: sessionData } = await _supabase.auth.getSession();
         if (sessionData?.session?.user) {
             barbeiroId = sessionData.session.user.id;
-            localStorage.setItem('barbeiroId', barbeiroId); // Recupera e salva para a próxima
+            localStorage.setItem('barbeiroId', barbeiroId);
         }
     }
 
-    // Se mesmo assim não achar, bloqueia
     if (!barbeiroId) {
-        console.error("Erro: ID do barbeiro não encontrado.");
         document.getElementById('container-tabela-fin').innerHTML = 
             '<div style="text-align:center; padding:20px;">' +
             '<p style="color:#e74c3c; font-weight:bold;">⚠️ Sessão não identificada.</p>' +
@@ -1954,11 +1866,9 @@ async function gerarRelatorioFinanceiro() {
 
     if (!dataInicio || !dataFim) return;
 
-    // Sinaliza carregamento
     document.getElementById('container-tabela-fin').innerHTML = '<p style="text-align:center; padding:20px;">⏳ Processando dados...</p>';
 
     try {
-        // 2. Busca agendamentos CONCLUÍDOS
         const { data: resultados, error } = await _supabase
             .from('agendamentos')
             .select(`
@@ -1972,7 +1882,6 @@ async function gerarRelatorioFinanceiro() {
 
         if (error) throw error;
 
-        // 3. Lógica de Cálculos
         let faturamentoTotal = 0;
         let totalAtendimentos = resultados ? resultados.length : 0;
         let resumoServicos = {}; 
@@ -1991,12 +1900,10 @@ async function gerarRelatorioFinanceiro() {
 
         const ticketMedio = totalAtendimentos > 0 ? (faturamentoTotal / totalAtendimentos) : 0;
 
-        // 4. Atualiza os Cards
         document.getElementById('fin-total-valor').innerText = faturamentoTotal.toLocaleString('pt-br', { style: 'currency', currency: 'BRL' });
         document.getElementById('fin-total-qtd').innerText = totalAtendimentos;
         document.getElementById('fin-ticket-medio').innerText = ticketMedio.toLocaleString('pt-br', { style: 'currency', currency: 'BRL' });
 
-        // 5. Monta a Tabela
         if (totalAtendimentos === 0) {
             document.getElementById('container-tabela-fin').innerHTML = '<p style="text-align:center; color:#888; padding:20px;">Nenhum faturamento registrado neste período.</p>';
         } else {
@@ -2027,7 +1934,6 @@ async function gerarRelatorioFinanceiro() {
         }
 
     } catch (err) {
-        console.error("Erro no processamento:", err);
         document.getElementById('container-tabela-fin').innerHTML = '<p style="color:red; text-align:center; padding:20px;">Falha ao conectar com o banco de dados.</p>';
     }
 }
@@ -2076,9 +1982,7 @@ function configurarDatasPadrao() {
 }
 
 
-// Função para ser chamada exclusivamente pela página Financeiro
 function inicializarFinanceiro() {
-    // 1. Recupera o Barbeiro do LocalStorage
     barbeiroLogadoId = localStorage.getItem('barbeiro_id') || localStorage.getItem('barbeiroId');
     
     if (!barbeiroLogadoId) {
@@ -2087,7 +1991,6 @@ function inicializarFinanceiro() {
         return;
     }
 
-    // 2. Configura as datas padrão (Início do mês até hoje)
     const hoje = new Date();
     const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
     const dataHoje = hoje.toISOString().split('T')[0];
@@ -2098,6 +2001,25 @@ function inicializarFinanceiro() {
     if (inputInicio) inputInicio.value = primeiroDia;
     if (inputFim) inputFim.value = dataHoje;
 
-    // 3. Carrega os dados pela primeira vez
     carregarRelatorioFaturamento();
+}
+
+function calcularPrecoTotal() {
+    const elServico = document.getElementById('servico');
+    const valorTotal = Array.from(elServico.selectedOptions).reduce((total, option) => {
+        const texto = option.text;
+        const match = texto.match(/R\$\s?([\d.,]+)/);
+        if (match) {
+            const preco = parseFloat(match[1].replace(',', '.'));
+            return total + preco;
+        }
+        return total;
+    }, 0);
+
+    const elPrecoExibicao = document.getElementById('preco_exibicao');
+    if (elPrecoExibicao) {
+        elPrecoExibicao.textContent = `Total: R$ ${valorTotal.toFixed(2).replace('.', ',')}`;
+    }
+    
+    return valorTotal; 
 }
